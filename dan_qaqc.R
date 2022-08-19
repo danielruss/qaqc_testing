@@ -5,9 +5,16 @@ library(rlang)
 
 #  read dictionary from Github
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
-dl <- map(dictionary,"Variable Label") %>% compact()
-
+#dl <- map(dictionary,"Variable Label") %>% compact()
+dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
 dictionary_lookup<-function(x){
+  if (is.list(x)){
+    return( 
+      x %>% map(~str_remove(.x,"^d_")) %>%
+        map(~recode(.x,!!!dl,.default = "Not In Label Dictionary")) %>%
+        map_chr(paste,collapse=", ")
+    )
+  }
   ## remove "d_" that may be at the start of the Id.
   x <- str_remove(x,"^d_") %>% na_if("")
   recode(x,!!!dl,.default = "Not In Label Dictionary")
@@ -20,31 +27,7 @@ convertToVector <- function(x){
   str_trim(unlist(str_split(x,pattern = ",")))
 }
 
-rules <- read_excel("~/QCRules_test2.xlsx",col_types = 'text') %>% 
-  mutate(ValidValues=map(ValidValues,convertToVector),
-         CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
-         CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
-         CrossVariableConceptID3Value=map(CrossVariableConceptID3Value,convertToVector) )
 
-
-#### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ=FALSE
-if (loadFromBQ){
-  project <- "nih-nci-dceg-connect-stg-5519"
-  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
-  tb <- bq_project_query(project, sql)
-  data <- bq_table_download(tb, bigint = c("character"))
-}else{
-  data <- rio::import("test_data.json") %>% as_tibble()
-}
-
-## add a failure...
-## invalid SITE
-test <- data
-test$d_827220437[[1]] <- "3"
-## xvalid1 invalid
-test$d_827220437[[2]] <- "4"
-test$d_512820379[[2]] <- "854703046"
 
 
 #### ==================== Code Really Starts here...
@@ -99,34 +82,44 @@ prepare_report <- function(data,l,ids){
            ConceptID=l$ConceptID,
            ConceptID_value=dictionary_lookup(ConceptID),
            ValidValues=list(l$ValidValues),
+           ValidValues_lookup=dictionary_lookup(ValidValues),
            CrossVariableConceptID1=l$CrossVariableConceptID1 %||% "",
-           CrossVariableConceptID1_value=dictionary_lookup(CrossVariableConceptID1),
+           CrossVariableConceptID1_lookup=dictionary_lookup(CrossVariableConceptID1),
            CrossVariableConceptValidValue1=list(l$CrossVariableConceptID1Value %||% ""),
+           CrossVariableConceptValidValue1_lookup=dictionary_lookup(CrossVariableConceptValidValue1),
            CrossVariable1Value=l$CrossVariable1Value %||% "",
            CrossVariableConceptID2=l$CrossVariableConceptID2 %||% "",
-           CrossVariableConceptID2_value=dictionary_lookup(CrossVariableConceptID2),
+           CrossVariableConceptID2_lookup=dictionary_lookup(CrossVariableConceptID2),
            CrossVariableConceptValidValue2=list(l$CrossVariableConceptID2Value %||% ""),
+           CrossVariableConceptValidValue2_lookup=dictionary_lookup(CrossVariableConceptValidValue2),
            CrossVariable2Value=l$CrossVariable2Value %||% "",
            CrossVariableConceptID3=l$CrossVariableConceptID3 %||% "",
-           CrossVariableConceptID3_value=dictionary_lookup(CrossVariableConceptID3),
+           CrossVariableConceptID3_lookup=dictionary_lookup(CrossVariableConceptID3),
            CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value %||% ""),
+           CrossVariableConceptValidValue3_lookup=dictionary_lookup(CrossVariableConceptValidValue3),
            CrossVariable3Value=l$CrossVariable3Value %||% "",
            qc_test = l$Qctype
     )  %>%
     select(qc_test,ConceptID,ConceptID_value,
-           date,ValidValues,invalid_values,
+           date,
+           ValidValues,ValidValues_lookup,
+           invalid_values,
            CrossVariableConceptID1,
-           CrossVariableConceptID1_value,
+           CrossVariableConceptID1_lookup,
            CrossVariable1Value,
            CrossVariableConceptValidValue1,
+           CrossVariableConceptValidValue1_lookup,
            CrossVariableConceptID2,
-           CrossVariableConceptID2_value,
+           CrossVariableConceptID2_lookup,
            CrossVariable2Value,
            CrossVariableConceptValidValue2,
+           CrossVariableConceptValidValue2_lookup,
            CrossVariableConceptID3,
-           CrossVariableConceptID3_value,
+           CrossVariableConceptID3_lookup,
            CrossVariable3Value,
-           CrossVariableConceptValidValue3,{{ids}})
+           CrossVariableConceptValidValue3,
+           CrossVariableConceptValidValue3_lookup,
+           {{ids}})
 }
 
 crossvalidly <- function(f){
@@ -353,7 +346,40 @@ runQC <- function(data, rules, QC_report_location,ids){
   )
 }
 
-x <- runQC(test,rules,ids=Connect_ID)
+
+
+
+
+#### YOU WILL WANT TO CHANGE THIS TO TRUE...
+loadFromBQ=FALSE
+if (loadFromBQ){
+  project <- "nih-nci-dceg-connect-stg-5519"
+  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
+  tb <- bq_project_query(project, sql)
+  data <- bq_table_download(tb, bigint = c("character"))
+}else{
+  data_file <- "~/test_data.json"
+  data <- rio::import(data_file) %>% tibble::as_tibble()
+}
+
+## add a failure...
+## invalid SITE
+test <- data
+test$d_827220437[[1]] <- "3"
+## xvalid1 invalid
+test$d_827220437[[2]] <- "4"
+test$d_512820379[[2]] <- "854703046"
+
+
+## I need to load the rules file....
+rules_file <- "~/QCRules_test2.xlsx"
+rules <- read_excel(rules_file,col_types = 'text') %>% 
+  mutate(ValidValues=map(ValidValues,convertToVector),
+         CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
+         CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
+         CrossVariableConceptID3Value=map(CrossVariableConceptID3Value,convertToVector) )
+
+system.time(x <- runQC(test,rules,ids=Connect_ID))
 x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
              CrossVariableConceptValidValue1= map_chr(CrossVariableConceptValidValue1,paste,collapse = ", "),
