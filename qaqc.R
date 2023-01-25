@@ -3,25 +3,32 @@ library(tidyverse)
 library(readxl)
 library(rlang)
 
-#  read dictionary from Github
-dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
+#  read dictionary from Github (TODO: Ask nicole about aggegate.json version of dictionary)
+# Dictionary used by Daniel to develop code (from Lorena)
+# dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
+
+# Dictionary provided by Nicole on Jan 19, 2023:
+#dictionary <- rio::import("https://github.com/episphere/conceptGithubActions/blob/master/aggregate.json",format = "json")
+dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
+
 #dl <- map(dictionary,"Variable Label") %>% compact()
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
 dictionary_lookup<-function(x){
   if (is.list(x)){
     return( 
-      x %>% map(~str_remove(.x,"^d_")) %>%
+      x %>% map(~str_remove(.x,"^d_")) %>% 
+        map(~str_remove(.x,"^state_d_")) %>% 
         map(~recode(.x,!!!dl,.default = "Not In Label Dictionary")) %>%
         map_chr(paste,collapse=", ")
     )
   }
-  ## remove "d_" that may be at the start of the Id.
-  x <- str_remove(x,"^d_") %>% na_if("")
+  ## remove "d_" or "state_d_" that may be at the start of the Id.
+  x <- str_remove(x,"^d_") %>% str_remove("^state_d_") %>% na_if("")
   recode(x,!!!dl,.default = "Not In Label Dictionary")
 }
 
 
-
+# Convert comma sep vals to vector, handling caveats
 convertToVector <- function(x){
   if (is.na(x) || nchar(x)==0) return(NA_character_)
   str_trim(unlist(str_split(x,pattern = ",")))
@@ -48,6 +55,7 @@ crossValidate <- function(value1,valid_values1,value2,valid_values2,value3,valid
 ## getCIDValues takes a string of a column name (a concept id), and looks up the
 ## the value in the data tibble.  The issue we need to be careful
 ## with are the NA's. Dont try to evaluate NAs..
+# Note: data is a column of data for a CID from BQ
 getCIDValue <- function(cid,data){
   stopifnot(length(cid)==1)
   if (is.na(cid)) {
@@ -57,6 +65,7 @@ getCIDValue <- function(cid,data){
 }
 
 prepare_list_for_report<-function(arg_list){
+  # JP NOTE: Guarantee that everything is defined, even if with an empty str
   arg_list$CrossVariableConceptID1 <- arg_list$CrossVariableConceptID1 %||% ""
   arg_list$CrossVariable1Value <- arg_list$CrossVariable1Value %||% ""
   arg_list$CrossVariableConceptValidValue1 <- list(arg_list$CrossVariableConceptID1Value %||% "")
@@ -98,11 +107,16 @@ prepare_report <- function(data,l,ids){
            CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value %||% ""),
            CrossVariableConceptValidValue3_lookup=dictionary_lookup(CrossVariableConceptValidValue3),
            CrossVariable3Value=l$CrossVariable3Value %||% "",
-           qc_test = l$Qctype
+           qc_test=l$Qctype
     )  %>%
-    select(qc_test,ConceptID,ConceptID_value,
+    select(Connect_ID,
+           token, 
+           qc_test,
+           ConceptID,
+           ConceptID_value,
            date,
-           ValidValues,ValidValues_lookup,
+           ValidValues,
+           ValidValues_lookup,
            invalid_values,
            CrossVariableConceptID1,
            CrossVariableConceptID1_lookup,
@@ -142,7 +156,9 @@ crossvalidly <- function(f){
               "\n\tXV_ID2:",l$CrossVariableConceptID2,
               "\n\tXV_ID3:",l$CrossVariableConceptID3)
     })
-
+    
+    # JP NOTE: Everything in report rows passed the cross valid, so valid() will only 
+    # run on the CIDs that passed the cross validation
     report_rows <- data %>% 
       ## add a column which is the value of the ConceptId of interest...
       mutate(value = cid_value,
@@ -177,7 +193,7 @@ valid <- function(data,ids,...){
   # R know that is a variable name (a symbol).  So we convert the conceptId to a symbol.  Then
   # we need to ask R if the value that the symbol points is in the set of valid values, not the symbol
   # itself.  So the !! dereferences the symbol to the value.
-  l=list(...)
+  l=list(...) # Column names that are passed in ...
 
   ## select all the invalid rows. and save it in the "failed" tibble...
   failed <- data %>% filter( !!sym(l$ConceptID) %!in% l$ValidValues)
@@ -289,7 +305,7 @@ has_less_than_or_equal_n_characters<-function(data,ids,...){
 na_or_has_less_than_or_equal_n_characters<-na_ok(has_less_than_or_equal_n_characters)
 crossvalid_has_less_than_or_equal_n_characters<- crossvalidly(has_less_than_or_equal_n_characters)
 
-
+# NOTE: This was needed to report bad rules
 find_errors <- function(rules,data){
   rules %>% mutate(
 #    qctype_na = is.na(Qctype),
@@ -298,18 +314,18 @@ find_errors <- function(rules,data){
     bad_xv2_cid = !CrossVariableConceptID2 %in|na% names(data),
     bad_xv3_cid = !CrossVariableConceptID3 %in|na% names(data),
 #    error = if_else(qctype_na,"The Qctype is NA.",""),
-    error = if_else(cid_not_in_data,"The ConceptID is not in the data.",""),
-    error = if_else(bad_xv1_cid, paste(error,"The Cross Variable ConceptID 1 is not in the data."),error),
-    error = if_else(bad_xv2_cid, paste(error,"The Cross Variable ConceptID 2 is not in the data."),error),
-    error = if_else(bad_xv3_cid, paste(error,"The Cross Variable ConceptID 3 is not in the data."),error)
+    error = if_else(cid_not_in_data,"CID not in BQ table",""),
+    error = if_else(bad_xv1_cid, paste(error,"Cross Var. CID 1 not in BQ table"),error),
+    error = if_else(bad_xv2_cid, paste(error,"Cross Var. CID 2 not in BQ table"),error),
+    error = if_else(bad_xv3_cid, paste(error,"Cross Var. CID 3 not in BQ table"),error)
   )  %>% select(!cid_not_in_data:bad_xv3_cid)
 }
 report_bad_rules <- function(...){
   l=list(...)
-  return(tibble(qc_test=l$Qctype,CID=l$ConceptID,date=l$date,ValidValues=list(l$ValidValues),invalid_values=l$error,
+  return(tibble(qc_test=l$Qctype,ConceptID=l$ConceptID,date=l$date,ValidValues=list(l$ValidValues),rules_error=l$error,
                 CrossVariableConceptID1=l$CrossVariableConceptID1,CrossVariable1Value="",CrossVariableConceptValidValue1=list(l$CrossVariableConceptID1Value),
                 CrossVariableConceptID2=l$CrossVariableConceptID2,CrossVariable2Value="",CrossVariableConceptValidValue2=list(l$CrossVariableConceptID2Value),
-                CrossVariableConceptID3=l$CrossVariableConceptID3,CrossVariable33Value="",CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value)
+                CrossVariableConceptID3=l$CrossVariableConceptID3,CrossVariable3Value="",CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value)
                 ))
 }
 
@@ -351,10 +367,12 @@ runQC <- function(data, rules, QC_report_location,ids){
 
 
 #### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ=FALSE
+loadFromBQ=TRUE
 if (loadFromBQ){
-  project <- "nih-nci-dceg-connect-stg-5519"
+  project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
   sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
+  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` WHERE Connect_ID IS NOT NULL" # Daniel's 
+  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` LIMIT 100" # Jake's modification
   tb <- bq_project_query(project, sql)
   data <- bq_table_download(tb, bigint = c("character"))
 }else{
@@ -372,14 +390,28 @@ test$d_512820379[[2]] <- "854703046"
 
 
 ## I need to load the rules file....
-rules_file <- "~/QCRules_test2.xlsx"
+rules_file <- "QCRules_test2.xlsx"
+#rules_file <- "qc_rules_011823.xlsx"
+# rules <- read_excel(rules_file,col_types = 'text')
 rules <- read_excel(rules_file,col_types = 'text') %>% 
   mutate(ValidValues=map(ValidValues,convertToVector),
          CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
          CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
          CrossVariableConceptID3Value=map(CrossVariableConceptID3Value,convertToVector) )
 
-system.time(x <- runQC(test,rules,ids=Connect_ID))
+system.time(x <- runQC(data, rules,ids=Connect_ID))
+
+col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date", 
+               "ValidValues", "invalid_values", 
+               "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1", 
+               "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2", 
+               "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3", 
+               "ConceptID_value", "ValidValues_lookup", 
+               "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup", 
+               "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup", 
+               "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
+x <- x[, col_order] 
+
 x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
              CrossVariableConceptValidValue1= map_chr(CrossVariableConceptValidValue1,paste,collapse = ", "),
@@ -387,4 +419,4 @@ x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
              CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
              CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
-)  %>% writexl::write_xlsx("qc_out.xlsx")
+)  %>% writexl::write_xlsx("qc_out_test.xlsx")
