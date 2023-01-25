@@ -209,6 +209,7 @@ valid <- function(data,ids,...){
 }
 crossvalid <- crossvalidly(valid)
 na_or_valid <- na_ok(valid)
+na_or_crossvalid <- na_ok(crossvalid)
 
 validDate <- function(data,ids,...){
   #message("... Running ValidDate")
@@ -348,9 +349,13 @@ runQC <- function(data, rules, QC_report_location,ids){
   bind_rows(
     bad_rules %>% pmap_dfr(report_bad_rules,date=run_date),
     rules %>% filter(Qctype=="valid") %>% pmap_dfr(valid,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or valid") %>% pmap_dfr(na_or_valid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid2") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid3") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid1") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid2") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid3") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1Date") %>% pmap_dfr(crossvalidDate,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1NotNA") %>% pmap_dfr(crossValid_notNA,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or dateTime") %>% pmap_dfr(na_or_datetime,data=data,ids={{ids}},date=run_date),
@@ -370,14 +375,15 @@ runQC <- function(data, rules, QC_report_location,ids){
 loadFromBQ=TRUE
 if (loadFromBQ){
   project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
-  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
+  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
   # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` WHERE Connect_ID IS NOT NULL" # Daniel's 
-  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` LIMIT 100" # Jake's modification
+  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` LIMIT 100" # Jake's modification
   tb <- bq_project_query(project, sql)
   data <- bq_table_download(tb, bigint = c("character"))
 }else{
-  data_file <- "~/test_data.json"
-  data <- rio::import(data_file) %>% tibble::as_tibble()
+  #data_file <- "~/test_data.json"
+  data_file <- "data.json"
+  data1 <- rio::import(data_file) %>% tibble::as_tibble()
 }
 
 ## add a failure...
@@ -390,7 +396,8 @@ test$d_512820379[[2]] <- "854703046"
 
 
 ## I need to load the rules file....
-rules_file <- "QCRules_test2.xlsx"
+#rules_file <- "QCRules_test2.xlsx"
+rules_file <- "lala_rules.xlsx"
 #rules_file <- "qc_rules_011823.xlsx"
 # rules <- read_excel(rules_file,col_types = 'text')
 rules <- read_excel(rules_file,col_types = 'text') %>% 
@@ -401,16 +408,16 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
 
 system.time(x <- runQC(data, rules,ids=Connect_ID))
 
-col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date", 
-               "ValidValues", "invalid_values", 
-               "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1", 
-               "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2", 
-               "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3", 
-               "ConceptID_value", "ValidValues_lookup", 
-               "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup", 
-               "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup", 
-               "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
-x <- x[, col_order] 
+# col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date", 
+#                "ValidValues", "invalid_values", 
+#                "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1", 
+#                "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2", 
+#                "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3", 
+#                "ConceptID_value", "ValidValues_lookup", 
+#                "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup", 
+#                "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup", 
+#                "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
+# x <- x[, col_order] 
 
 x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
@@ -419,4 +426,4 @@ x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
              CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
              CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
-)  %>% writexl::write_xlsx("qc_out_test.xlsx")
+)  %>% writexl::write_xlsx("qc_out_lala_rules.xlsx")
