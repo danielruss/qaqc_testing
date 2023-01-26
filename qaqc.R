@@ -377,7 +377,7 @@ if (loadFromBQ){
   project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
   # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
   # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` WHERE Connect_ID IS NOT NULL" # Daniel's 
-  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` LIMIT 100" # Jake's modification
+  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`" # Jake's modification
   tb <- bq_project_query(project, sql)
   data <- bq_table_download(tb, bigint = c("character"))
 }else{
@@ -397,7 +397,7 @@ test$d_512820379[[2]] <- "854703046"
 
 ## I need to load the rules file....
 #rules_file <- "QCRules_test2.xlsx"
-rules_file <- "lala_rules.xlsx"
+rules_file <- "qc_rules_011823_na_corrected.xlsx"
 #rules_file <- "qc_rules_011823.xlsx"
 # rules <- read_excel(rules_file,col_types = 'text')
 rules <- read_excel(rules_file,col_types = 'text') %>% 
@@ -408,16 +408,16 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
 
 system.time(x <- runQC(data, rules,ids=Connect_ID))
 
-# col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date", 
-#                "ValidValues", "invalid_values", 
-#                "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1", 
-#                "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2", 
-#                "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3", 
-#                "ConceptID_value", "ValidValues_lookup", 
-#                "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup", 
-#                "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup", 
-#                "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
-# x <- x[, col_order] 
+col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date",
+               "ValidValues", "invalid_values",
+               "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1",
+               "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2",
+               "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3",
+               "ConceptID_value", "ValidValues_lookup",
+               "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup",
+               "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup",
+               "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
+x <- x[, col_order]
 
 x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
@@ -426,4 +426,4 @@ x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
              CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
              CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
-)  %>% writexl::write_xlsx("qc_out_lala_rules.xlsx")
+)  %>% writexl::write_xlsx("qc_out_011823_na_corrected.xlsx")
