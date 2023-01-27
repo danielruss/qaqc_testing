@@ -3,10 +3,6 @@ library(tidyverse)
 library(readxl)
 library(rlang)
 
-#  read dictionary from Github (TODO: Ask nicole about aggegate.json version of dictionary)
-# Dictionary used by Daniel to develop code (from Lorena)
-# dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
-
 # Dictionary provided by Nicole on Jan 19, 2023:
 #dictionary <- rio::import("https://github.com/episphere/conceptGithubActions/blob/master/aggregate.json",format = "json")
 dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
@@ -89,7 +85,9 @@ prepare_report <- function(data,l,ids){
            value2="",
            date=l$date,
            ConceptID=l$ConceptID,
-           ConceptID_value=dictionary_lookup(ConceptID),
+           rule_error="",
+           rule_label=l$Label,
+           ConceptID_lookup=dictionary_lookup(ConceptID),
            ValidValues=list(l$ValidValues),
            ValidValues_lookup=dictionary_lookup(ValidValues),
            CrossVariableConceptID1=l$CrossVariableConceptID1 %||% "",
@@ -112,8 +110,10 @@ prepare_report <- function(data,l,ids){
     select(Connect_ID,
            token, 
            qc_test,
+           rule_label,
+           rule_error,
            ConceptID,
-           ConceptID_value,
+           ConceptID_lookup,
            date,
            ValidValues,
            ValidValues_lookup,
@@ -309,12 +309,10 @@ crossvalid_has_less_than_or_equal_n_characters<- crossvalidly(has_less_than_or_e
 # NOTE: This was needed to report bad rules
 find_errors <- function(rules,data){
   rules %>% mutate(
-#    qctype_na = is.na(Qctype),
     cid_not_in_data=ConceptID %!in% names(data),
     bad_xv1_cid = !CrossVariableConceptID1 %in|na% names(data), 
     bad_xv2_cid = !CrossVariableConceptID2 %in|na% names(data),
     bad_xv3_cid = !CrossVariableConceptID3 %in|na% names(data),
-#    error = if_else(qctype_na,"The Qctype is NA.",""),
     error = if_else(cid_not_in_data,"CID not in BQ table",""),
     error = if_else(bad_xv1_cid, paste(error,"Cross Var. CID 1 not in BQ table"),error),
     error = if_else(bad_xv2_cid, paste(error,"Cross Var. CID 2 not in BQ table"),error),
@@ -323,7 +321,7 @@ find_errors <- function(rules,data){
 }
 report_bad_rules <- function(...){
   l=list(...)
-  return(tibble(qc_test=l$Qctype,ConceptID=l$ConceptID,date=l$date,ValidValues=list(l$ValidValues),rules_error=l$error,
+  return(tibble(qc_test=l$Qctype,ConceptID=l$ConceptID,date=l$date,ValidValues=list(l$ValidValues),rule_error=l$error,
                 CrossVariableConceptID1=l$CrossVariableConceptID1,CrossVariable1Value="",CrossVariableConceptValidValue1=list(l$CrossVariableConceptID1Value),
                 CrossVariableConceptID2=l$CrossVariableConceptID2,CrossVariable2Value="",CrossVariableConceptValidValue2=list(l$CrossVariableConceptID2Value),
                 CrossVariableConceptID3=l$CrossVariableConceptID3,CrossVariable3Value="",CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value)
@@ -337,14 +335,6 @@ runQC <- function(data, rules, QC_report_location,ids){
   bad_rules <- rules %>% filter(nchar(error)>0) 
   filtered_rules <- rules %>% filter(!is.na(Qctype) & nchar(error)==0)
   rules <- filtered_rules %>% select(!error)
-  
-
-  # I assume you have a document that can be read into a tibble, a column can be something 
-  # other than a simple primitive (e.g. a list/vector).  This is referred to as a list-column.
-  # one column of the tibble is the QC Type (valid/crossvalid1).  You will want to split the 
-  # table by QC_type...
-  # check_valid <- rules_tibble %>% filter(QCType=="valid")
-  # of course you can just stick this in the bind_rows command...
   
   bind_rows(
     bad_rules %>% pmap_dfr(report_bad_rules,date=run_date),
@@ -375,9 +365,7 @@ runQC <- function(data, rules, QC_report_location,ids){
 loadFromBQ=TRUE
 if (loadFromBQ){
   project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
-  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.Connect.recruitment1` where Connect_ID is not NULL"
-  # sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP` WHERE Connect_ID IS NOT NULL" # Daniel's 
-  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`" # Jake's modification
+  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`" 
   tb <- bq_project_query(project, sql)
   data <- bq_table_download(tb, bigint = c("character"))
 }else{
@@ -396,10 +384,7 @@ test$d_512820379[[2]] <- "854703046"
 
 
 ## I need to load the rules file....
-#rules_file <- "QCRules_test2.xlsx"
 rules_file <- "qc_rules_011823_na_corrected.xlsx"
-#rules_file <- "qc_rules_011823.xlsx"
-# rules <- read_excel(rules_file,col_types = 'text')
 rules <- read_excel(rules_file,col_types = 'text') %>% 
   mutate(ValidValues=map(ValidValues,convertToVector),
          CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
@@ -408,15 +393,16 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
 
 system.time(x <- runQC(data, rules,ids=Connect_ID))
 
-col_order <- c("Connect_ID", "token", "qc_test", "rules_error", "ConceptID", "date",
+col_order <- c("Connect_ID", "token", "qc_test", "rule_error", "ConceptID", "rule_label",
                "ValidValues", "invalid_values",
                "CrossVariableConceptID1", "CrossVariable1Value", "CrossVariableConceptValidValue1",
                "CrossVariableConceptID2", "CrossVariable2Value", "CrossVariableConceptValidValue2",
                "CrossVariableConceptID3", "CrossVariable3Value", "CrossVariableConceptValidValue3",
-               "ConceptID_value", "ValidValues_lookup",
+               "ConceptID_lookup", "ValidValues_lookup",
                "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1_lookup",
                "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2_lookup",
-               "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup")
+               "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3_lookup",
+               "date")
 x <- x[, col_order]
 
 x %>% mutate(ValidValues = map_chr(ValidValues,paste,collapse = ", "),
