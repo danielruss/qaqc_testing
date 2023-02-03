@@ -9,20 +9,18 @@ dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGi
 
 #dl <- map(dictionary,"Variable Label") %>% compact()
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
-dictionary_lookup<-function(x){
-  if (is.list(x)){
-    return( 
-      x %>% map(~str_remove(.x,"^d_")) %>% 
-        map(~str_remove(.x,"^state_d_")) %>% 
-        map(~recode(.x,!!!dl,.default = "Not In Label Dictionary")) %>%
-        map_chr(paste,collapse=", ")
-    )
-  }
-  ## remove "d_" or "state_d_" that may be at the start of the Id.
-  x <- str_remove(x,"^d_") %>% str_remove("^state_d_") %>% na_if("")
-  recode(x,!!!dl,.default = "Not In Label Dictionary")
-}
+dictionary_lookup <- function(x){
+  x=as.list(x)
+  skel <- as.relistable(x)
+  x <- unlist(x)
 
+  x <- x %>% str_remove_all("^d_|^state_d_|(?<=_)d_") %>% 
+    map(~dl[[.x]]) %>% 
+    modify_if(is.null,~"Not in Dictionary")
+  x <- relist(x,skel)
+  class(x) <- "list"
+  x
+}
 
 # Convert comma sep vals to vector, handling caveats
 convertToVector <- function(x){
@@ -362,7 +360,7 @@ runQC <- function(data, rules, QC_report_location,ids){
 
 
 #### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ=TRUE
+loadFromBQ=FALSE
 if (loadFromBQ){
   project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
   sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`" 
@@ -371,7 +369,7 @@ if (loadFromBQ){
 }else{
   #data_file <- "~/test_data.json"
   data_file <- "data.json"
-  data1 <- rio::import(data_file) %>% tibble::as_tibble()
+  data <- rio::import(data_file) %>% tibble::as_tibble()
 }
 
 ## add a failure...
@@ -391,7 +389,7 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
          CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
          CrossVariableConceptID3Value=map(CrossVariableConceptID3Value,convertToVector) )
 
-system.time(x <- runQC(data, rules,ids=Connect_ID))
+print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 
 col_order <- c("Connect_ID", "token", "qc_test", "rule_error", "ConceptID", "rule_label",
                "ValidValues", "invalid_values",
