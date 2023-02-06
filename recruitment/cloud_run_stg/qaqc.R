@@ -1,8 +1,9 @@
-# test3
+# test
 library(bigrquery)
 library(tidyverse)
 library(readxl)
 library(rlang)
+library(plumber)
 
 #* heartbeat...
 #* @get /
@@ -11,7 +12,7 @@ function(){
   return("alive")
 }
 
-#* Runs STAGE qa_qc
+#* Runs STAGE QAQC
 #* @get /qaqc-recruitment
 #* @post /qaqc-recruitment
 function() {
@@ -395,7 +396,7 @@ function() {
   
   
   ## I need to load the rules file....
-  rules_file <- "qc_rules_011823_na_corrected.xlsx"
+  rules_file <- "qc_rules.xlsx"
   rules <- read_excel(rules_file,col_types = 'text') %>% 
     mutate(ValidValues=map(ValidValues,convertToVector),
            CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
