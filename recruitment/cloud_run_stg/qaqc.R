@@ -3,17 +3,17 @@ library(tidyverse)
 library(readxl)
 library(rlang)
 
-# #* heartbeat...
-# #* @get /
-# #* @post /
-# function(){
-#   return("alive")
-# }
-# 
-# #* Runs STAGE qa_qc
-# #* @get /qaqc
-# #* @post /qaqc
-# function() {
+#* heartbeat...
+#* @get /
+#* @post /
+function(){
+  return("alive")
+}
+
+#* Runs STAGE qa_qc
+#* @get /qaqc-recruitment
+#* @post /qaqc-recruitment
+function() {
   
   # Dictionary provided by Nicole on Jan 19, 2023:
   #dictionary <- rio::import("https://github.com/episphere/conceptGithubActions/blob/master/aggregate.json",format = "json")
@@ -429,4 +429,4 @@ library(rlang)
                CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
   )  %>% writexl::write_xlsx(paste0("qc_participants_",time_stamp,".xlsx"))
   
-# }
+}
