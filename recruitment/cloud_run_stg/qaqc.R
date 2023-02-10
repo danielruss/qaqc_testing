@@ -1,7 +1,7 @@
 # test
+library(tidyverse)
 library(bigrquery)
 library(tidyverse)
-library(readxl)
 library(rlang)
 library(plumber)
 
