@@ -376,8 +376,8 @@ function() {
   #### YOU WILL WANT TO CHANGE THIS TO TRUE...
   loadFromBQ=TRUE
   if (loadFromBQ){
-    project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
-    sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`" 
+    project <- "nih-nci-dceg-connect-prod-6d04" # just the project it gets billed from
+    sql <- "SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP`" 
     tb <- bq_project_query(project, sql)
     data <- bq_table_download(tb, bigint = c("character"))
   }else{
@@ -429,6 +429,6 @@ function() {
                CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
                CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
                CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
-  )  %>% writexl::write_xlsx(paste0("qc_participants_stg_",time_stamp,".xlsx"))
+  )  %>% writexl::write_xlsx(paste0("qc_participants_prod_",time_stamp,".xlsx"))
   
 }
