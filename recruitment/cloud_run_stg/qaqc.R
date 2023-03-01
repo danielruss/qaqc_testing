@@ -458,14 +458,36 @@ runQC <- function(data, rules, QC_report_location,ids){
 #### YOU WILL WANT TO CHANGE THIS TO TRUE...
 loadFromBQ=TRUE
 if (loadFromBQ){
-  project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
-  sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`"
+  #project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
+  #sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`"
   # project <- "nih-nci-dceg-connect-prod-6d04"
   # sql <- "SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP`" 
-  tb <- bq_project_query(project, sql)
-  data <- bq_table_download(tb, bigint = c("character"))
+  # tb <- bq_project_query(project, sql)
+  # data <- bq_table_download(tb, bigint = c("character"))
+  
   # Manipulate data here so that it has everything I need to check
   # including if I'm pulling data from multiple tables
+  recr_var <- bq_project_query(project, query="SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='participants_JP'")
+  recrvar  <- bigrquery::bq_table_download(recr_var,bigint = "integer64")
+  recrvar_d <- recrvar[grepl("d_",recrvar$column_name),]
+  
+  nvar = floor((length(recrvar_d$column_name))/5) ##to define the number of variables in each sql extract from GCP
+  nvar
+  
+  # Start column for each split data frame
+  start = seq(1,length(recrvar_d$column_name),nvar)
+  end <- length(recrvar_d$column_name)
+  # 
+  recrbq <- list()
+  
+  for (i in (1:length(start)))  {
+    select <- paste(recrvar_d$column_name[start[i]:(min(start[i]+nvar-1,end))],collapse=",")
+    tmp <- eval(parse(text=paste("bq_project_query(project, query=\"SELECT token,Connect_ID,", select,"FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP` Where d_512820379 != '180583933' \")",sep=" ")))
+    
+    recrbq[[i]] <- bq_table_download(tmp, bigint="integer64")
+  }
+  
+  data <- recrbq %>% reduce(inner_join, by = c("token","Connect_ID"))
 }else{
   #data_file <- "~/test_data.json"
   data_file <- "data.json"
@@ -500,8 +522,8 @@ time_stamp <- gsub("-","_",
                         gsub(":","_",
                              Sys.time())))
 
+report_fid <- paste0("qc_report_recruitment_prod_",time_stamp,".xlsx")
 #report_fid <- paste0("qc_report_recruitment_stg_",time_stamp,".xlsx")
-report_fid <- paste0("qc_report_recruitment_stg_",time_stamp,".xlsx")
 x %>% mutate(ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
              ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
