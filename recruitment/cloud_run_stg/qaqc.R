@@ -112,7 +112,9 @@ prepare_list_for_report<-function(arg_list){
 
 prepare_report <- function(data,l,ids){
   data %>% 
-    mutate(invalid_values=!!sym(l$ConceptID),
+    mutate(site_id=data$d_827220437,
+           site=dictionary_lookup(data$d_827220437),
+           invalid_values=!!sym(l$ConceptID),
            value2="",
            date=l$date,
            ConceptID=l$ConceptID,
@@ -145,6 +147,8 @@ prepare_report <- function(data,l,ids){
     )  %>%
     select(Connect_ID,
            token, 
+           site_id,
+           site,
            qc_test,
            rule_label,
            rule_error,
@@ -456,18 +460,26 @@ runQC <- function(data, rules, QC_report_location,ids){
 
 
 #### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ=TRUE
+loadFromBQ <- TRUE
+tier <- "prod"
+project <- switch(tier,
+                  dev  = "nih-nci-dceg-connect-dev",
+                  stg  = "nih-nci-dceg-connect-stg-5519",
+                  prod = "nih-nci-dceg-connect-prod-6d04")
+
 if (loadFromBQ){
+  # Daniel's old code
   #project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
   #sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`"
   # project <- "nih-nci-dceg-connect-prod-6d04"
-  # sql <- "SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP`" 
-  # tb <- bq_project_query(project, sql)
   # data <- bq_table_download(tb, bigint = c("character"))
   
   # Manipulate data here so that it has everything I need to check
   # including if I'm pulling data from multiple tables
-  recr_var <- bq_project_query(project, query="SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='participants_JP'")
+  
+  # Modification to download in chunks
+  query <- paste0("SELECT * FROM `", project, ".FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='participants_JP'")
+  recr_var <- bq_project_query(project, query=query)
   recrvar  <- bigrquery::bq_table_download(recr_var,bigint = "integer64")
   recrvar_d <- recrvar[grepl("d_",recrvar$column_name),]
   
@@ -482,12 +494,14 @@ if (loadFromBQ){
   
   for (i in (1:length(start)))  {
     select <- paste(recrvar_d$column_name[start[i]:(min(start[i]+nvar-1,end))],collapse=",")
-    tmp <- eval(parse(text=paste("bq_project_query(project, query=\"SELECT token,Connect_ID,", select,"FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP` Where d_512820379 != '180583933' \")",sep=" ")))
-    
+    # Should I include this filter? WHERE d_512820379 != '180583933'
+    text <- paste("bq_project_query(project, query=\"SELECT token,Connect_ID,", select," FROM `",project,".FlatConnect.participants_JP`\")",sep="")
+    tmp <- eval(parse(text=text))
     recrbq[[i]] <- bq_table_download(tmp, bigint="integer64")
   }
   
   data <- recrbq %>% reduce(inner_join, by = c("token","Connect_ID"))
+  
 }else{
   #data_file <- "~/test_data.json"
   data_file <- "data.json"
@@ -508,7 +522,7 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 x <- runQC(data, rules,ids=Connect_ID)
 
-col_order <- c("Connect_ID", "token", "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
+col_order <- c("Connect_ID", "token", "site_id", "site", "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
                "ValidValues", "ValidValues_lookup", "invalid_values",
                "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
                "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
@@ -522,9 +536,10 @@ time_stamp <- gsub("-","_",
                         gsub(":","_",
                              Sys.time())))
 
-report_fid <- paste0("qc_report_recruitment_prod_",time_stamp,".xlsx")
+report_fid <- paste0("qc_report_recruitment_",tier,"_",time_stamp,".xlsx")
 #report_fid <- paste0("qc_report_recruitment_stg_",time_stamp,".xlsx")
-x %>% mutate(ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
+x %>% mutate(site = map_chr(site,paste,collapse=", "),
+             ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
              ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
@@ -552,6 +567,6 @@ if (push_to_cloud_storage) {
   bucket <- "gs://qaqc_reports"
   token <- token_fetch(scopes=scope)
   gcs_auth(token=token)
-  gcs_upload(report_fid, bucket=bucket, name="qc_report_recruitment")
+  gcs_upload(report_fid, bucket=bucket, name=report_fid)
 }
 # }
