@@ -27,7 +27,7 @@ library(stringr)
 ####################    Define Parameters Here     #############################
 # For QC_REPORT, select "recruitment" or "biospecimen"
 QC_REPORT  <- "biospecimen"
-rules_file <- "qc_rules_biospecimen_current.xlsx"
+rules_file <- "qc_rules_michelle_test.xlsx"
 # QC_REPORT  <- "recruitment" 
 # rules_file <- "qc_rules_3_27_23.xlsx"
 tier       <- "prod"
@@ -46,11 +46,11 @@ project    <- switch(tier,
 # Get data dictionary (Version provided by Nicole on Jan 19, 2023)
 dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
+#dl <-  dictionary %>% map(~.x[["Variable Name"]] %||% .x[["Variable Label"]]) %>% compact()
 
 
 
-
-######################### User-defined Functinos ###############################
+######################### User-defined Functions ###############################
 
 dictionary_lookup <- function(x){
   x=as.list(x)
@@ -132,6 +132,7 @@ prepare_report <- function(data,l,ids){
     mutate(site_id=data$d_827220437,
            site=dictionary_lookup(site_id),
            invalid_values=!!sym(l$ConceptID),
+           invalid_values_lookup=dictionary_lookup(invalid_values),
            value2="",
            date=l$date,
            ConceptID=l$ConceptID,
@@ -175,6 +176,7 @@ prepare_report <- function(data,l,ids){
            ValidValues,
            ValidValues_lookup,
            invalid_values,
+           invalid_values_lookup,
            CrossVariableConceptID1,
            CrossVariableConceptID1_lookup,
            #CrossVariable1Value,
@@ -488,8 +490,8 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
       vars   <- bq_project_query(project, query=query)
       vars_  <- bigrquery::bq_table_download(vars,bigint = "integer64")
       vars_d <- vars_[grepl("d_",vars_$column_name),]
-      print(paste0(table,' has these variables: '))
-      print(vars_$column_name)
+      # print(paste0(table,' has these variables: '))
+      # print(vars_$column_name)
       
       # Define range of data to download per chunk
       nvar   <- floor((length(vars_d$column_name))/5) # num vars to per query
@@ -525,53 +527,218 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
 
 }
 
+
 get_explanation <- function(x) {
-  x <- x %>% 
+  x <- x %>%
     mutate(
-      
       explanation = case_when(
+        qc_test == "valid" ~ ### TODO
+          (function(x)
+            sprintf("[%s] should be [%s], but it's [%s].",
+                    x$ConceptID_lookup, 
+                    x$ValidValues_lookup, 
+                    x$invalid_values_lookup)
+            ) (x),
         
-        qc_test %in% c("valid", "NA or valid") ~ 
-          (function(x) str="1") (ConceptID),
+        qc_test == "NA or valid" ~ ### TODO
+          (function(x)
+            sprintf("%s should be %s or NA, but it's %s.",
+                    x$ConceptID_lookup, 
+                    x$ValidValues_lookup, 
+                    x$invalid_values_lookup)
+           ) (x),
         
-        qc_test %in% 
-          c("crossValid1", "crossValid2", "crossValid3", "crossValid4", 
-            "NA or crossValid1", "NA or crossValid2", "NA or crossValid3", 
-            "NA or crossValid4") ~ 
-          (function(x) str="2") (ConceptID),
+        # "NA or crossValid1", "NA or crossValid2", "NA or crossValid3", "NA or crossValid4"
+        # "crossValid2", "crossValid3", "crossValid4"
+        qc_test == c("crossValid1") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("crossValid2") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("crossValid3") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$CrossVariableConceptID3_lookup,
+                    x$CrossVariableConceptValidValue3_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("crossValid4") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$CrossVariableConceptID3_lookup,
+                    x$CrossVariableConceptValidValue3_lookup,
+                    x$CrossVariableConceptID4_lookup,
+                    x$CrossVariableConceptValidValue4_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        ###
+        qc_test == c("NA or crossValid1") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("NA or crossValid2") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("NA or crossValid3") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$CrossVariableConceptID3_lookup,
+                    x$CrossVariableConceptValidValue3_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        qc_test == c("NA or crossValid4") ~ 
+          (function(x)
+            sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$CrossVariableConceptID2_lookup,
+                    x$CrossVariableConceptValidValue2_lookup,
+                    x$CrossVariableConceptID3_lookup,
+                    x$CrossVariableConceptValidValue3_lookup,
+                    x$CrossVariableConceptID4_lookup,
+                    x$CrossVariableConceptValidValue4_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+          ) (x),
+        ###
         
         qc_test == "is populated" ~ 
-          (function(x) str="3") (ConceptID),
+          (function(x) 
+            sprintf("[%s] should be populated, but it's missing.", 
+                    x$ConceptID_lookup)
+           ) (x),
         
         qc_test == "crossValid1 equal to char()" ~ 
-          (function(x) str="4") (ConceptID),
+          (function(x) 
+            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s].", 
+                   x$CrossVariableConceptID1_lookup,
+                   x$CrossVariableConceptValidValue1_lookup,
+                   x$ConceptID_lookup,
+                   x$ValidValues)
+           ) (x),
         
         qc_test == "NA or equal to char()" ~ 
-          (function(x) str="5") (ConceptID),
+          (function(x) 
+            sprintf("[%s] should either be NA or a string of length [%s].",
+                    x$CrossVariableConceptID1_lookup,
+                    x$ValidValues)
+           ) (x),
         
         qc_test == "crossValid1 equal to or less than char()" ~ 
-          (function(x) str="6") (ConceptID),
+          (function(x) 
+            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s] or less.", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues)
+           ) (x),
         
         qc_test == "NA or equal to or less than char()" ~ 
-          (function(x) str="7") (ConceptID),
+          (function(x) 
+            sprintf("[%s] should be NA or a string of length [%s] or less.", 
+                    x$ConceptID_lookup,
+                    x$ValidValues)
+            ) (x),
         
         qc_test == "crossValid1Date" ~ 
-          (function(x) str="8") (ConceptID),
+          (function(x) 
+            sprintf("If [%s] is [%s], then [%s] should be a valid date, but it's [%s]", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$invalid_values_lookup)
+           ) (x), 
         
         qc_test == "crossValid1NotNA" ~ 
-          (function(x) str="9") (ConceptID),
+          (function(x) 
+            sprintf("If [%s] is [%s], then [%s] should NA or a valid date, but it's [%s]", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$invalid_values_lookup)
+            ) (x),
         
         qc_test == "NA or crossvalid before date()" ~ 
-          (function(x) str="10") (ConceptID),
+          (function(x) 
+            sprintf("If [%s] is [%s], then [%s] should be before [%s] or NA, but it's [%s]", 
+                    x$CrossVariableConceptID1_lookup,
+                    x$CrossVariableConceptValidValue1_lookup,
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+            ) (x),
         
         qc_test == "NA or valid before date()" ~ 
-          (function(x) str="11") (ConceptID),
-        
-        qc_test == "NA or valid before date()" ~ 
-          (function(x) str="12") (ConceptID),
+          (function(x) 
+            sprintf("[%s] should be before [%s] or NA, but it's [%s]", 
+                    x$ConceptID_lookup,
+                    x$ValidValues_lookup,
+                    x$invalid_values_lookup)
+            ) (x),
         
         qc_test == "valid before date()" ~ 
-          (function(x) str="13") (ConceptID)
+          (function(x) 
+            sprintf("[%s] should be before [%s] , but it's [%s]", 
+                    x$ConceptID_lookup,
+                    x$ValidValues,
+                    x$invalid_values_lookup)
+          ) (x),
+        
+        .default = "NA"
         
       ))
 }
@@ -608,19 +775,7 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
-x <- runQC(data, rules,ids=Connect_ID) %>% get_explanation()
-
-# Alter column order
-col_order <- c("Connect_ID", "token", 
-               "site_id", "site", 
-               "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
-               "ValidValues", "ValidValues_lookup", "invalid_values",
-               "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
-               "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
-               "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
-               "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
-               "date", "explanation")
-x <- x[, col_order]
+x <- runQC(data, rules, ids=Connect_ID) 
 
 # Convert arrays to strings so that they can be written to excel correctly, 
 # otherwise arrays of strings appear as blank cells in excel sheet
@@ -629,6 +784,7 @@ x <- x %>% mutate(
              ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
              ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
+             invalid_values_lookup = map_chr(invalid_values_lookup,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
              CrossVariableConceptID1_lookup= map_chr(CrossVariableConceptID1_lookup,paste,collapse = ", "),
              CrossVariableConceptValidValue1= map_chr(CrossVariableConceptValidValue1,paste,collapse = ", "),
@@ -645,7 +801,19 @@ x <- x %>% mutate(
              CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
              CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
              CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
-)
+) %>% get_explanation()
+
+# Alter column order
+col_order <- c("Connect_ID", "token", 
+               "site_id", "site", 
+               "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
+               "ValidValues", "ValidValues_lookup", "invalid_values",
+               "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
+               "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
+               "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
+               "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
+               "date", "explanation")
+x <- x[, col_order]
 
 # Write report and rules to separate sheets of excel file
 writexl::write_xlsx(list(report=x, rules=rules), report_fid)
