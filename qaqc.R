@@ -1,4 +1,3 @@
-# test
 library(tidyverse)
 library(bigrquery)
 library(tidyverse)
@@ -7,7 +6,9 @@ library(plumber)
 library(googleCloudStorageR)
 library(gargle)
 library(readxl)
+library(stringr)
 
+####################### Un-comment to use plummer api ##########################
 # #* heartbeat...
 # #* @get /
 # #* @post /
@@ -20,21 +21,49 @@ library(readxl)
 # #* @post /qaqc-recruitment
 # function() {
 
-# Dictionary provided by Nicole on Jan 19, 2023:
-#dictionary <- rio::import("https://github.com/episphere/conceptGithubActions/blob/master/aggregate.json",format = "json")
-dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
 
-#dl <- map(dictionary,"Variable Label") %>% compact()
+
+################################################################################
+####################    Define Parameters Here     #############################
+# For QC_REPORT, select "recruitment" or "biospecimen"
+QC_REPORT  <- "biospecimen"
+rules_file <- "qc_rules_biospecimen_current.xlsx"
+# QC_REPORT  <- "recruitment" 
+# rules_file <- "qc_rules_3_27_23.xlsx"
+tier       <- "prod"
+################################################################################
+################################################################################
+
+# Name of output/report file
+report_fid <- paste0("qc_report_",QC_REPORT,"_",tier,"_",Sys.Date(),".xlsx")
+
+# Look-up table of project ids
+project    <- switch(tier,
+                     dev  = "nih-nci-dceg-connect-dev",
+                     stg  = "nih-nci-dceg-connect-stg-5519",
+                     prod = "nih-nci-dceg-connect-prod-6d04")
+
+# Get data dictionary (Version provided by Nicole on Jan 19, 2023)
+dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
+
+
+
+
+######################### User-defined Functinos ###############################
+
 dictionary_lookup <- function(x){
   x=as.list(x)
   skel <- as.relistable(x)
   x <- unlist(x)
   
-  x <- x %>% str_remove_all("^d_|^state_d_|(?<=_)d_") %>% 
+  # str_remove_all("^d_|^state_d_|(?<=_)d_") %>% 
+  x <- x %>% 
+    str_split_i("d_", -1) %>% # Get last CID without "d_"
     map(~dl[[.x]]) %>% 
-    #modify_if(is.null,~"Not in Dictionary")
     modify_if(is.null,~"NA")
+    # str_split_i("d_", -1) # Get last CID without "d_", vars like "token" are uneffected..
+    #modify_if(is.null,~"Not in Dictionary")
   x <- relist(x,skel)
   class(x) <- "list"
   # x <- x %>% lapply(unlist) %>% lapply(paste, collapse=(', ')) 
@@ -56,13 +85,6 @@ convertToVector <- function(x){
 # Be careful in using this pipes, which I think are much cooler and easier to read.
 `%!in%` <- function(x,y){ !`%in%`(x,y) }
 `%in|na%` <- function(x,y){ is.na(x) | x %in% y }
-# `%in|fun%` <- function(x,y){
-#   if (y[1]=="populated") {
-#     return(!is.na(x))
-#   } else {
-#     return(x %in% y)
-#   }
-# }
 
 # I'm not really happy with this function...  I would like to pass
 # in two vectors values and valid_values. This way we are not locked
@@ -71,9 +93,6 @@ convertToVector <- function(x){
 crossValidate <- function(value1,valid_values1,value2,valid_values2,value3,valid_values3,value4,valid_values4){
   (value1 %in% valid_values1) & (value2 %in% valid_values2) & (value3 %in% valid_values3) & (value4 %in% valid_values4)
 }
-# crossValidate <- function(value1,valid_values1,value2,valid_values2,value3,valid_values3,value4,valid_values4){
-#   (value1 %in|fun% valid_values1) & (value2 %in|fun% valid_values2) & (value3 %in|fun% valid_values3) & (value4 %in|fun% valid_values4)
-# }
 
 ## getCIDValues takes a string of a column name (a concept id), and looks up the
 ## the value in the data tibble.  The issue we need to be careful
@@ -87,6 +106,7 @@ getCIDValue <- function(cid,data){
   eval_tidy(sym(cid),data)
 }
 
+## Functions for initializing the report dataframe
 prepare_list_for_report<-function(arg_list){
   # JP NOTE: Guarantee that everything is defined, even if with an empty str
   arg_list$CrossVariableConceptID1 <- arg_list$CrossVariableConceptID1 %||% ""
@@ -107,12 +127,11 @@ prepare_list_for_report<-function(arg_list){
   
   arg_list
 }
-
-
-
 prepare_report <- function(data,l,ids){
   data %>% 
-    mutate(invalid_values=!!sym(l$ConceptID),
+    mutate(site_id=data$d_827220437,
+           site=dictionary_lookup(site_id),
+           invalid_values=!!sym(l$ConceptID),
            value2="",
            date=l$date,
            ConceptID=l$ConceptID,
@@ -145,6 +164,8 @@ prepare_report <- function(data,l,ids){
     )  %>%
     select(Connect_ID,
            token, 
+           site_id,
+           site,
            qc_test,
            rule_label,
            rule_error,
@@ -177,6 +198,7 @@ prepare_report <- function(data,l,ids){
            {{ids}})
 }
 
+## Adverb functions to be used to modify validation functions
 crossvalidly <- function(f){
   function(data,ids,...){
     l = list(...)  
@@ -221,7 +243,6 @@ crossvalidly <- function(f){
     
   }
 }
-
 na_ok <- function(f){
   function(data,ids,...){
     f(data,ids={{ids}},na_ok=TRUE,...) %>%
@@ -229,7 +250,7 @@ na_ok <- function(f){
   }
 }
 
-
+## Validation Rules 
 valid <- function(data,ids,...){
   #message("... Running valid")
   # ok, this is a difficult concept, but the conceptId is passed in as string.
@@ -423,12 +444,12 @@ runQC <- function(data, rules, QC_report_location,ids){
   rules <- filtered_rules %>% select(!error)
   
   bind_rows(
-    bad_rules %>% pmap_dfr(report_bad_rules,date=run_date),
+    bad_rules %>% pmap_dfr(report_bad_rules,date=run_date), 
     rules %>% filter(Qctype=="valid") %>% pmap_dfr(valid,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="valid before date") %>% pmap_dfr(validBeforeDate,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="crossvalid before date") %>% pmap_dfr(crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="NA or valid before date") %>% pmap_dfr(na_or_validBeforeDate,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="NA or crossvalid before date") %>% pmap_dfr(na_or_crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="valid before date()") %>% pmap_dfr(validBeforeDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="crossvalid before date()") %>% pmap_dfr(crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or valid before date()") %>% pmap_dfr(na_or_validBeforeDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossvalid before date()") %>% pmap_dfr(na_or_crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or valid") %>% pmap_dfr(na_or_valid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="is populated") %>% pmap_dfr(isPopulated,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
@@ -451,54 +472,134 @@ runQC <- function(data, rules, QC_report_location,ids){
   )
 }
 
-
-
-
-
-#### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ=TRUE
-if (loadFromBQ){
-  #project <- "nih-nci-dceg-connect-stg-5519" # just the project it gets billed from
-  #sql <- "SELECT * FROM `nih-nci-dceg-connect-stg-5519.FlatConnect.participants_JP`"
-  # project <- "nih-nci-dceg-connect-prod-6d04"
-  # sql <- "SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP`" 
-  # tb <- bq_project_query(project, sql)
-  # data <- bq_table_download(tb, bigint = c("character"))
+loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
   
-  # Manipulate data here so that it has everything I need to check
-  # including if I'm pulling data from multiple tables
-  recr_var <- bq_project_query(project, query="SELECT * FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='participants_JP'")
-  recrvar  <- bigrquery::bq_table_download(recr_var,bigint = "integer64")
-  recrvar_d <- recrvar[grepl("d_",recrvar$column_name),]
-  
-  nvar = floor((length(recrvar_d$column_name))/5) ##to define the number of variables in each sql extract from GCP
-  nvar
-  
-  # Start column for each split data frame
-  start = seq(1,length(recrvar_d$column_name),nvar)
-  end <- length(recrvar_d$column_name)
-  # 
-  recrbq <- list()
-  
-  for (i in (1:length(start)))  {
-    select <- paste(recrvar_d$column_name[start[i]:(min(start[i]+nvar-1,end))],collapse=",")
-    tmp <- eval(parse(text=paste("bq_project_query(project, query=\"SELECT token,Connect_ID,", select,"FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP` Where d_512820379 != '180583933' \")",sep=" ")))
+  data <- list()
+  for (table in tables) {
     
-    recrbq[[i]] <- bq_table_download(tmp, bigint="integer64")
+    if (!download_in_chunks) {
+      
+      sql <- sprintf("SELECT * FROM `%s.%s` %s", project, table, where_clause)
+      data[[table]] <- bq_table_download(tb, bigint = c("character"))
+      
+    } else {
+      
+      query  <- sprintf("SELECT * FROM `%s.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='%s'", project, table)
+      vars   <- bq_project_query(project, query=query)
+      vars_  <- bigrquery::bq_table_download(vars,bigint = "integer64")
+      vars_d <- vars_[grepl("d_",vars_$column_name),]
+      print(paste0(table,' has these variables: '))
+      print(vars_$column_name)
+      
+      # Define range of data to download per chunk
+      nvar   <- floor((length(vars_d$column_name))/5) # num vars to per query
+      start  <- seq(1,length(vars_d$column_name),nvar)
+      end    <- length(vars_d$column_name)
+      
+      # Loop through groups of columns and build up bq_data dataset
+      bq_data <- list()
+      for (i in (1:length(start)))  {
+        select <- paste(vars_d$column_name[start[i]:(min(start[i]+nvar-1,end))],
+                        collapse=",")
+        q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
+                     select, project, table, where_clause)
+        tmp <- bq_project_query(project, query=q)
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64")
+      }
+      
+      # Join list of datasets into single dateset
+      join_keys     <- c("token", "Connect_ID")
+      data[[table]] <- bq_data %>% reduce(inner_join, by = join_keys)
+      
+    }
+    
   }
   
-  data <- recrbq %>% reduce(inner_join, by = c("token","Connect_ID"))
-}else{
-  #data_file <- "~/test_data.json"
-  data_file <- "data.json"
-  data <- rio::import(data_file) %>% tibble::as_tibble()
+  if (length(data) > 1){
+    join_keys <- c("Connect_ID", "token", "d_827220437")
+    data      <- data %>% reduce(left_join, by = join_keys)
+    #data <- left_join(data[[1]], data[[2]], by =c("Connect_ID", "token", "d_827220437"))
+  } else {
+    data <- data[[1]]
+  }
+
+}
+
+get_explanation <- function(x) {
+  x <- x %>% 
+    mutate(
+      
+      explanation = case_when(
+        
+        qc_test %in% c("valid", "NA or valid") ~ 
+          (function(x) str="1") (ConceptID),
+        
+        qc_test %in% 
+          c("crossValid1", "crossValid2", "crossValid3", "crossValid4", 
+            "NA or crossValid1", "NA or crossValid2", "NA or crossValid3", 
+            "NA or crossValid4") ~ 
+          (function(x) str="2") (ConceptID),
+        
+        qc_test == "is populated" ~ 
+          (function(x) str="3") (ConceptID),
+        
+        qc_test == "crossValid1 equal to char()" ~ 
+          (function(x) str="4") (ConceptID),
+        
+        qc_test == "NA or equal to char()" ~ 
+          (function(x) str="5") (ConceptID),
+        
+        qc_test == "crossValid1 equal to or less than char()" ~ 
+          (function(x) str="6") (ConceptID),
+        
+        qc_test == "NA or equal to or less than char()" ~ 
+          (function(x) str="7") (ConceptID),
+        
+        qc_test == "crossValid1Date" ~ 
+          (function(x) str="8") (ConceptID),
+        
+        qc_test == "crossValid1NotNA" ~ 
+          (function(x) str="9") (ConceptID),
+        
+        qc_test == "NA or crossvalid before date()" ~ 
+          (function(x) str="10") (ConceptID),
+        
+        qc_test == "NA or valid before date()" ~ 
+          (function(x) str="11") (ConceptID),
+        
+        qc_test == "NA or valid before date()" ~ 
+          (function(x) str="12") (ConceptID),
+        
+        qc_test == "valid before date()" ~ 
+          (function(x) str="13") (ConceptID)
+        
+      ))
 }
 
 
+#################### Start of Main Script ######################################
+#### YOU WILL WANT TO CHANGE THIS TO TRUE...
+loadFromBQ <- TRUE
+if (loadFromBQ){
+
+  if (QC_REPORT == "biospecimen") {
+    # Tables MUST BE listed in order appropriate for LEFT JOIN!!
+    tables       <- c('biospecimen_JP','participants_JP')
+    where_clause <- "WHERE Connect_ID IS NOT NULL"
+  } 
+  else if (QC_REPORT == "recruitment") {
+    tables       <- c('participants_JP')
+    where_clause <- ""
+  }
+  data <- loadData(project, tables, where_clause, download_in_chunks = TRUE)
+  
+}else{
+  data_file <- "data.json"
+  data      <- rio::import(data_file) %>% tibble::as_tibble()
+}
 
 ## I need to load the rules file....
-rules_file <- "qc_rules_2_28_23.xlsx"
-rules <- read_excel(rules_file,col_types = 'text') %>% 
+rules <- read_excel(rules_file,col_types = 'text') %>%  
   mutate(ValidValues=map(ValidValues,convertToVector),
          CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
          CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
@@ -506,25 +607,26 @@ rules <- read_excel(rules_file,col_types = 'text') %>%
          CrossVariableConceptID4Value=map(CrossVariableConceptID4Value,convertToVector))
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
-x <- runQC(data, rules,ids=Connect_ID)
+# Run QC report
+x <- runQC(data, rules,ids=Connect_ID) %>% get_explanation()
 
-col_order <- c("Connect_ID", "token", "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
+# Alter column order
+col_order <- c("Connect_ID", "token", 
+               "site_id", "site", 
+               "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
                "ValidValues", "ValidValues_lookup", "invalid_values",
                "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
                "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
                "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
                "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
-               "date")
+               "date", "explanation")
 x <- x[, col_order]
 
-time_stamp <- gsub("-","_", 
-                   gsub(" ","_",
-                        gsub(":","_",
-                             Sys.time())))
-
-report_fid <- paste0("qc_report_recruitment_prod_",time_stamp,".xlsx")
-#report_fid <- paste0("qc_report_recruitment_stg_",time_stamp,".xlsx")
-x %>% mutate(ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
+# Convert arrays to strings so that they can be written to excel correctly, 
+# otherwise arrays of strings appear as blank cells in excel sheet
+x <- x %>% mutate(
+             site = map_chr(site,paste,collapse=", "),
+             ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
              ValidValues = map_chr(ValidValues,paste,collapse = ", "),
              ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
              CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
@@ -543,15 +645,20 @@ x %>% mutate(ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
              CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
              CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
              CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
-) %>% writexl::write_xlsx(report_fid)
+)
 
+# Write report and rules to separate sheets of excel file
+writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+
+# Upload report to cloud storage if desired
 push_to_cloud_storage <- FALSE
 if (push_to_cloud_storage) {
   # Authenticate with Google Storage and write report file to bucket
-  scope <- c("https://www.googleapis.com/auth/cloud-platform")
+  scope  <- c("https://www.googleapis.com/auth/cloud-platform")
   bucket <- "gs://qaqc_reports"
-  token <- token_fetch(scopes=scope)
+  token  <- token_fetch(scopes=scope)
   gcs_auth(token=token)
-  gcs_upload(report_fid, bucket=bucket, name="qc_report_recruitment")
+  gcs_upload(report_fid, bucket=bucket, name=report_fid)
 }
-# }
+
+#}

@@ -4,3 +4,7 @@
 .Ruserdata
 qaqc_testing.Rproj
 qc_out.xlsx
+olds/
+recruitment/.DS_Store
+recruitment/cloud_run_stg/~$*
+*.DS_Store
