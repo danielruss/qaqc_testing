@@ -27,10 +27,11 @@ library(stringr)
 ####################    Define Parameters Here     #############################
 # For QC_REPORT, select "recruitment" or "biospecimen"
 QC_REPORT  <- "biospecimen"
-rules_file <- "qc_rules_michelle_test.xlsx"
-# QC_REPORT  <- "recruitment" 
-# rules_file <- "qc_rules_3_27_23.xlsx"
+rules_file <- "qc_rules_biospecimen.xlsx"
 tier       <- "prod"
+# QC_REPORT  <- "recruitment"
+# rules_file <- "qc_rules_recruitment_04_03_2023.xlsx"
+# tier       <- "stg"
 ################################################################################
 ################################################################################
 
@@ -481,7 +482,8 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
     
     if (!download_in_chunks) {
       
-      sql <- sprintf("SELECT * FROM `%s.%s` %s", project, table, where_clause)
+      sql <- sprintf("SELECT token, Connect_ID, * FROM `%s.%s` %s", project, table, where_clause)
+      tb  <- bq_project_query(project, query=sql)
       data[[table]] <- bq_table_download(tb, bigint = c("character"))
       
     } else {
@@ -528,7 +530,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
 }
 
 
-get_explanation <- function(x) {
+get_explanation <- function(x, data) {
   x <- x %>%
     mutate(
       explanation = case_when(
@@ -542,15 +544,13 @@ get_explanation <- function(x) {
         
         qc_test == "NA or valid" ~ ### TODO
           (function(x)
-            sprintf("%s should be %s or NA, but it's %s.",
+            sprintf("[%s] should be [%s] or NA, but it's [%s].",
                     x$ConceptID_lookup, 
                     x$ValidValues_lookup, 
                     x$invalid_values_lookup)
            ) (x),
-        
-        # "NA or crossValid1", "NA or crossValid2", "NA or crossValid3", "NA or crossValid4"
-        # "crossValid2", "crossValid3", "crossValid4"
-        qc_test == c("crossValid1") ~ 
+
+        qc_test == "crossValid1" ~ 
           (function(x)
             sprintf("If [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -560,7 +560,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("crossValid2") ~ 
+        qc_test == "crossValid2" ~ 
           (function(x)
             sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -572,7 +572,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("crossValid3") ~ 
+        qc_test == "crossValid3" ~ 
           (function(x)
             sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -586,7 +586,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("crossValid4") ~ 
+        qc_test == "crossValid4" ~ 
           (function(x)
             sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -603,7 +603,7 @@ get_explanation <- function(x) {
           ) (x),
         
         ###
-        qc_test == c("NA or crossValid1") ~ 
+        qc_test == "NA or crossValid1" ~ 
           (function(x)
             sprintf("If [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -613,7 +613,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("NA or crossValid2") ~ 
+        qc_test == "NA or crossValid2" ~ 
           (function(x)
             sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -625,7 +625,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("NA or crossValid3") ~ 
+        qc_test == "NA or crossValid3" ~ 
           (function(x)
             sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -639,7 +639,7 @@ get_explanation <- function(x) {
                     x$invalid_values_lookup)
           ) (x),
         
-        qc_test == c("NA or crossValid4") ~ 
+        qc_test == "NA or crossValid4" ~ 
           (function(x)
             sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
                     x$CrossVariableConceptID1_lookup,
@@ -664,34 +664,42 @@ get_explanation <- function(x) {
         
         qc_test == "crossValid1 equal to char()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s].", 
+            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s], but it's [%s] with length [%s].", 
                    x$CrossVariableConceptID1_lookup,
                    x$CrossVariableConceptValidValue1_lookup,
                    x$ConceptID_lookup,
-                   x$ValidValues)
+                   x$ValidValues,
+                   x$invalid_values,
+                   length(x$invalid_values))
            ) (x),
         
         qc_test == "NA or equal to char()" ~ 
           (function(x) 
-            sprintf("[%s] should either be NA or a string of length [%s].",
+            sprintf("[%s] should either be NA or a string of length [%s], but it's [%s] with length [%s].",
                     x$CrossVariableConceptID1_lookup,
-                    x$ValidValues)
+                    x$ValidValues,
+                    x$invalid_values,
+                    length(x$invalid_values))
            ) (x),
         
         qc_test == "crossValid1 equal to or less than char()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s] or less.", 
+            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s] or less, but it's [%s] with length [%s].", 
                     x$CrossVariableConceptID1_lookup,
                     x$CrossVariableConceptValidValue1_lookup,
                     x$ConceptID_lookup,
-                    x$ValidValues)
+                    x$ValidValues,
+                    x$invalid_values,
+                    length(x$invalid_values))
            ) (x),
         
         qc_test == "NA or equal to or less than char()" ~ 
           (function(x) 
-            sprintf("[%s] should be NA or a string of length [%s] or less.", 
+            sprintf("[%s] should be NA or a string of length [%s] or less, but it's [%s] with length [%s].", 
                     x$ConceptID_lookup,
-                    x$ValidValues)
+                    x$ValidValues,
+                    x$invalid_values,
+                    length(x$invalid_values))
             ) (x),
         
         qc_test == "crossValid1Date" ~ 
@@ -700,7 +708,7 @@ get_explanation <- function(x) {
                     x$CrossVariableConceptID1_lookup,
                     x$CrossVariableConceptValidValue1_lookup,
                     x$ConceptID_lookup,
-                    x$invalid_values_lookup)
+                    x$invalid_values)
            ) (x), 
         
         qc_test == "crossValid1NotNA" ~ 
@@ -714,28 +722,34 @@ get_explanation <- function(x) {
         
         qc_test == "NA or crossvalid before date()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be before [%s] or NA, but it's [%s]", 
+            sprintf("If [%s] is [%s], then [%s] should be before [%s] or NA, but they are [%s] and [%s], respectively.", 
                     x$CrossVariableConceptID1_lookup,
                     x$CrossVariableConceptValidValue1_lookup,
                     x$ConceptID_lookup,
                     x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+                    x$invalid_values,
+                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
+                    )
             ) (x),
         
         qc_test == "NA or valid before date()" ~ 
           (function(x) 
-            sprintf("[%s] should be before [%s] or NA, but it's [%s]", 
+            sprintf("[%s] should be before [%s] or NA, but they are [%s] and [%s], respectively.", 
                     x$ConceptID_lookup,
                     x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+                    x$invalid_values,
+                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
+                    )
             ) (x),
         
         qc_test == "valid before date()" ~ 
           (function(x) 
-            sprintf("[%s] should be before [%s] , but it's [%s]", 
+            sprintf("[%s] should be before [%s], but they are [%s] and [%s], respectively.", 
                     x$ConceptID_lookup,
                     x$ValidValues,
-                    x$invalid_values_lookup)
+                    x$invalid_values,
+                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
+                    )
           ) (x),
         
         .default = "NA"
@@ -751,14 +765,16 @@ if (loadFromBQ){
 
   if (QC_REPORT == "biospecimen") {
     # Tables MUST BE listed in order appropriate for LEFT JOIN!!
-    tables       <- c('biospecimen_JP','participants_JP')
-    where_clause <- "WHERE Connect_ID IS NOT NULL"
+    tables              <- c('biospecimen_JP','participants_JP')
+    where_clause        <- "WHERE Connect_ID IS NOT NULL"
+    download_in_chunks  <- TRUE
   } 
   else if (QC_REPORT == "recruitment") {
-    tables       <- c('participants_JP')
-    where_clause <- ""
+    tables              <- c('participants_JP')
+    where_clause        <- ""
+    download_in_chunks  <- TRUE
   }
-  data <- loadData(project, tables, where_clause, download_in_chunks = TRUE)
+  data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
   
 }else{
   data_file <- "data.json"
@@ -801,7 +817,8 @@ x <- x %>% mutate(
              CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
              CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
              CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
-) %>% get_explanation()
+            ) 
+x <- x %>% get_explanation(data)
 
 # Alter column order
 col_order <- c("Connect_ID", "token", 
