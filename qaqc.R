@@ -26,12 +26,12 @@ library(stringr)
 ################################################################################
 ####################    Define Parameters Here     #############################
 # For QC_REPORT, select "recruitment" or "biospecimen"
-QC_REPORT  <- "biospecimen"
-rules_file <- "qc_rules_biospecimen.xlsx"
-tier       <- "prod"
-# QC_REPORT  <- "recruitment"
-# rules_file <- "qc_rules_recruitment_04_03_2023.xlsx"
-# tier       <- "stg"
+# QC_REPORT  <- "biospecimen"
+# rules_file <- "qc_rules_biospecimen.xlsx"
+# tier       <- "prod"
+QC_REPORT  <- "recruitment"
+rules_file <- "qc_rules_recruitment_04_03_2023.xlsx"
+tier       <- "stg"
 ################################################################################
 ################################################################################
 
@@ -534,227 +534,139 @@ get_explanation <- function(x, data) {
   x <- x %>%
     mutate(
       explanation = case_when(
-        qc_test == "valid" ~ ### TODO
-          (function(x)
-            sprintf("[%s] should be [%s], but it's [%s].",
-                    x$ConceptID_lookup, 
-                    x$ValidValues_lookup, 
-                    x$invalid_values_lookup)
+        qc_test == "valid" ~
+          (function(x) 
+            glue("[{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
             ) (x),
         
-        qc_test == "NA or valid" ~ ### TODO
+        qc_test == "NA or valid" ~ 
           (function(x)
-            sprintf("[%s] should be [%s] or NA, but it's [%s].",
-                    x$ConceptID_lookup, 
-                    x$ValidValues_lookup, 
-                    x$invalid_values_lookup)
+            glue("[{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
            ) (x),
 
         qc_test == "crossValid1" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "crossValid2" ~ 
           (function(x)
-            sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}]",
+                 " & [{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
+                 "then [{x$ConceptID_lookup}], should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "crossValid3" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$CrossVariableConceptID3_lookup,
-                    x$CrossVariableConceptValidValue3_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}],",
+                    "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}] ",
+                  "& [{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "crossValid4" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$CrossVariableConceptID3_lookup,
-                    x$CrossVariableConceptValidValue3_lookup,
-                    x$CrossVariableConceptID4_lookup,
-                    x$CrossVariableConceptValidValue4_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                    "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
+                    "[{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}] ",
+                  "& [{x$CrossVariableConceptID4_lookup}] is [{x$CrossVariableConceptValidValue4_lookup}], ",
+                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
         
-        ###
         qc_test == "NA or crossValid1" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
+            "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "NA or crossValid2" ~ 
           (function(x)
-            sprintf("If [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
+                  "& [{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
+                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "NA or crossValid3" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$CrossVariableConceptID3_lookup,
-                    x$CrossVariableConceptValidValue3_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                    "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}] ",
+                  "& [{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}], ",
+                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
         
         qc_test == "NA or crossValid4" ~ 
           (function(x)
-            sprintf("If [%s] is [%s], [%s] is [%s], [%s] is [%s] & [%s] is [%s], then [%s] should be [%s or NA], but it's [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$CrossVariableConceptID2_lookup,
-                    x$CrossVariableConceptValidValue2_lookup,
-                    x$CrossVariableConceptID3_lookup,
-                    x$CrossVariableConceptValidValue3_lookup,
-                    x$CrossVariableConceptID4_lookup,
-                    x$CrossVariableConceptValidValue4_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                    "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
+                    "[{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}] ",
+                  "& [{x$CrossVariableConceptID4_lookup}] is [{x$CrossVariableConceptValidValue4_lookup}], ",
+                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
-        ###
-        
-        qc_test == "is populated" ~ 
-          (function(x) 
-            sprintf("[%s] should be populated, but it's missing.", 
-                    x$ConceptID_lookup)
-           ) (x),
+
+        qc_test == "is populated" ~ (function(x) glue("[{x$ConceptID_lookup}] should be populated, but it's missing.")) (x),
         
         qc_test == "crossValid1 equal to char()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s], but it's [%s] with length [%s].", 
-                   x$CrossVariableConceptID1_lookup,
-                   x$CrossVariableConceptValidValue1_lookup,
-                   x$ConceptID_lookup,
-                   x$ValidValues,
-                   x$invalid_values,
-                   length(x$invalid_values))
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be a string of length [{x$ValidValues}], ",
+                 "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
         
         qc_test == "NA or equal to char()" ~ 
           (function(x) 
-            sprintf("[%s] should either be NA or a string of length [%s], but it's [%s] with length [%s].",
-                    x$CrossVariableConceptID1_lookup,
-                    x$ValidValues,
-                    x$invalid_values,
-                    length(x$invalid_values))
+            glue("[{x$CrossVariableConceptID1_lookup}] should either be NA or a string of length [{x$ValidValues}], ",
+                 "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
         
         qc_test == "crossValid1 equal to or less than char()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be a string of length [%s] or less, but it's [%s] with length [%s].", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues,
-                    x$invalid_values,
-                    length(x$invalid_values))
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be a string of length [{x$ValidValues}] or less, ",
+                 "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
         
         qc_test == "NA or equal to or less than char()" ~ 
           (function(x) 
-            sprintf("[%s] should be NA or a string of length [%s] or less, but it's [%s] with length [%s].", 
-                    x$ConceptID_lookup,
-                    x$ValidValues,
-                    x$invalid_values,
-                    length(x$invalid_values))
-            ) (x),
+            glue("[{x$ConceptID_lookup}] should be NA or a string of length [{x$ValidValues}] or less, ",
+                 "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
+          ) (x),
         
         qc_test == "crossValid1Date" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be a valid date, but it's [%s]", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$invalid_values)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be a valid date, but it's [{x$invalid_values}]")
            ) (x), 
         
         qc_test == "crossValid1NotNA" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should NA or a valid date, but it's [%s]", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$invalid_values_lookup)
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should NA or a valid date, but it's [{x$invalid_values_lookup}]")
             ) (x),
         
         qc_test == "NA or crossvalid before date()" ~ 
           (function(x) 
-            sprintf("If [%s] is [%s], then [%s] should be before [%s] or NA, but they are [%s] and [%s], respectively.", 
-                    x$CrossVariableConceptID1_lookup,
-                    x$CrossVariableConceptValidValue1_lookup,
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values,
-                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
-                    )
+            glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
+                 "then [{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
+                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
             ) (x),
         
         qc_test == "NA or valid before date()" ~ 
           (function(x) 
-            sprintf("[%s] should be before [%s] or NA, but they are [%s] and [%s], respectively.", 
-                    x$ConceptID_lookup,
-                    x$ValidValues_lookup,
-                    x$invalid_values,
-                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
-                    )
+            glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
+                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
             ) (x),
         
         qc_test == "valid before date()" ~ 
           (function(x) 
-            sprintf("[%s] should be before [%s], but they are [%s] and [%s], respectively.", 
-                    x$ConceptID_lookup,
-                    x$ValidValues,
-                    x$invalid_values,
-                    "Field Not Available Yet" #eval(parse(text=sprintf("data[data$token %s x$token,]$%s","%in%", x$ValidValues)))
-                    )
+            glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues}], ",
+                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
           ) (x),
         
         .default = "NA"
         
-      ))
+      )
+    )
 }
 
 
