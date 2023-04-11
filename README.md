@@ -8,10 +8,10 @@ qaqc.R is a script that is used to generate a qc_report (excel), given a query t
 
 Use the Issues tab to submit requests for new rules.
 
-When you submit new rules please assign them to a member of the C4C Analytics team.
+When you submit new rules please assign them to a member of the C4C Analytics team and add them to the QAQC project so that they can be tracked via the
 
 Please assign recruitment QAQC issues to Madhuri and Jake.
 
 Please assign biospecimen QAQC issues to Kelsey and Jake.
 
-A *how-to guide* for the QAQC rule submission process can be found here: link.
+A *how-to guide* for the QAQC rule submission process can be found here: <https://nih.app.box.com/file/1185137275319>
