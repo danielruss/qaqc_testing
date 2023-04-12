@@ -7,7 +7,7 @@ library(googleCloudStorageR)
 library(gargle)
 library(readxl)
 library(stringr)
-
+library(glue)
 ####################### Un-comment to use plummer api ##########################
 # #* heartbeat...
 # #* @get /
@@ -26,17 +26,22 @@ library(stringr)
 ################################################################################
 ####################    Define Parameters Here     #############################
 # For QC_REPORT, select "recruitment" or "biospecimen"
-# QC_REPORT  <- "biospecimen"
-# rules_file <- "qc_rules_biospecimen.xlsx"
-# tier       <- "prod"
-QC_REPORT  <- "recruitment"
-rules_file <- "qc_rules_recruitment_04_03_2023.xlsx"
+QC_REPORT  <- "biospecimen"
+rules_file <- "qc_rules_biospecimen.xlsx"
+#sheet      <- "TestMichelles" 
+#sheet      <- "Kelseys" 
+sheet      <- "Jings"
 tier       <- "stg"
+# QC_REPORT  <- "recruitment"
+# rules_file <- "qc_rules_recruitment_04_10_2023.xlsx"
+# sheet      <- NULL
+# tier       <- "stg"
 ################################################################################
 ################################################################################
 
 # Name of output/report file
-report_fid <- paste0("qc_report_",QC_REPORT,"_",tier,"_",Sys.Date(),".xlsx")
+report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
+                     "_",tier,"_",Sys.Date(),".xlsx")
 
 # Look-up table of project ids
 project    <- switch(tier,
@@ -296,9 +301,10 @@ validBeforeDate <- function(data,ids,...){
     lubridate::ymd(date_from_valid_vals),
     lubridate::ymd_hms(date_from_valid_vals) )
   
-  # should fail if NA or if date to check is later than valid values date
   
+  # should fail if NA or if date to check is later than valid values date
   failed <- data %>% filter( is.na(date_to_check) | date_to_check >= date_from_valid_vals )
+  #l$ValidValues <- c(l$ValidValues, date_from_valid_vals)
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -317,6 +323,18 @@ isPopulated <- function(data,ids,...){
   prepare_report(failed,l,{{ids}})
 }
 crossvalidIsPopulated <- crossvalidly(isPopulated)
+
+# Filter values that are NA
+isNotPopulated <- function(data,ids,...){
+  l=list(...) # Column names that are passed in ...
+  
+  value_to_check <- getCIDValue(l$ConceptID,data)
+  failed <- data %>% filter(!is.na(value_to_check))
+  
+  l <- prepare_list_for_report(l)
+  prepare_report(failed,l,{{ids}})
+}
+crossvalidIsNotPopulated <- crossvalidly(isPopulated)
 
 validDate <- function(data,ids,...){
   #message("... Running ValidDate")
@@ -455,11 +473,13 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(Qctype=="NA or crossvalid before date()") %>% pmap_dfr(na_or_crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or valid") %>% pmap_dfr(na_or_valid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="is populated") %>% pmap_dfr(isPopulated,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="is not populated") %>% pmap_dfr(isNotPopulated,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid2") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid3") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid4") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1 is populated") %>% pmap_dfr(crossvalidIsPopulated,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="crossValid1 is not populated") %>% pmap_dfr(crossvalidIsNotPopulated,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or crossValid1") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or crossValid2") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or crossValid3") %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
@@ -530,7 +550,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
 }
 
 
-get_explanation <- function(x, data) {
+get_explanation <- function(x) {
   x <- x %>%
     mutate(
       explanation = case_when(
@@ -615,7 +635,7 @@ get_explanation <- function(x, data) {
         
         qc_test == "NA or equal to char()" ~ 
           (function(x) 
-            glue("[{x$CrossVariableConceptID1_lookup}] should either be NA or a string of length [{x$ValidValues}], ",
+            glue("[{x$ConceptID_lookup}] should either be NA or a string of length [{x$ValidValues}], ",
                  "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
         
@@ -641,28 +661,28 @@ get_explanation <- function(x, data) {
         qc_test == "crossValid1NotNA" ~ 
           (function(x) 
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
-                 "then [{x$ConceptID_lookup}] should NA or a valid date, but it's [{x$invalid_values_lookup}]")
+                 "then [{x$ConceptID_lookup}] must not be NA, but it's [{x$invalid_values_lookup}]")
             ) (x),
         
         qc_test == "NA or crossvalid before date()" ~ 
           (function(x) 
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
-                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
+                 "but they are [{x$invalid_values}] and [], respectively.")
             ) (x),
         
         qc_test == "NA or valid before date()" ~ 
           (function(x) 
             glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
-                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
+                 "but they are [{x$invalid_values}] and [], respectively.")
             ) (x),
         
         qc_test == "valid before date()" ~ 
           (function(x) 
             glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues}], ",
-                 "but they are [{x$invalid_values}] and [{x$ValidValues_lookup}], respectively.")
+                 "but they are [{x$invalid_values}] and [], respectively.")
           ) (x),
-        
+        # getCIDValue(l$CrossVariableConceptID1,data)
         .default = "NA"
         
       )
@@ -694,7 +714,7 @@ if (loadFromBQ){
 }
 
 ## I need to load the rules file....
-rules <- read_excel(rules_file,col_types = 'text') %>%  
+rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%  
   mutate(ValidValues=map(ValidValues,convertToVector),
          CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
          CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
@@ -730,7 +750,7 @@ x <- x %>% mutate(
              CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
              CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
             ) 
-x <- x %>% get_explanation(data)
+x <- x %>% get_explanation()
 
 # Alter column order
 col_order <- c("Connect_ID", "token", 
