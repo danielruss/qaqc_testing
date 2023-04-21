@@ -9,6 +9,8 @@ library(readxl)
 library(stringr)
 library(glue)
 library(janitor)
+source("get_merged_module_1_data.R")
+
 ####################### Un-comment to use plummer api ##########################
 # #* heartbeat...
 # #* @get /
@@ -73,16 +75,12 @@ dictionary_lookup <- function(x){
   skel <- as.relistable(x)
   x <- unlist(x)
   
-  # str_remove_all("^d_|^state_d_|(?<=_)d_") %>% 
   x <- x %>% 
     str_split_i("d_", -1) %>% # Get last CID without "d_"
     map(~dl[[.x]]) %>% 
     modify_if(is.null,~"NA")
-    # str_split_i("d_", -1) # Get last CID without "d_", vars like "token" are uneffected..
-    #modify_if(is.null,~"Not in Dictionary")
   x <- relist(x,skel)
   class(x) <- "list"
-  # x <- x %>% lapply(unlist) %>% lapply(paste, collapse=(', ')) 
   x
 }
 
@@ -571,112 +569,6 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
     data <- data[[1]]
   }
 
-}
-
-get_merged_module_1_data <- function(project) {
-  
-  sql_M1_1 <- bq_project_query(project, query=glue("SELECT * FROM `{project}.FlatConnect.module1_v1_JP`"))
-  sql_M1_2 <- bq_project_query(project, query=glue("SELECT * FROM `{project}.FlatConnect.module1_v2_JP`"))
-  
-  M1_V1 <- bq_table_download(sql_M1_1,bigint = "integer64") #1436 #1436 vars: 1507 01112023
-  M1_V2 <- bq_table_download(sql_M1_2,bigint = "integer64") #2333 #3033 01112023 var:1531
-  
-  # Check that it doesn't match any non-number
-  numbers_only <- function(x) !grepl("\\D", x)
-  mod1_v1 <- M1_V1
-  cnames <- names(M1_V1)
-  
-  ###to check variables and convert to numeric
-  for (i in 1: length(cnames)){
-    varname <- cnames[i]
-    var     <-pull(mod1_v1,varname)
-    mod1_v1[,cnames[i]] <- ifelse(numbers_only(var), as.numeric(as.character(var)), var)
-  }
-  mod1_v2 <- M1_V2
-  cnames  <- names(M1_V2)
-  
-  ###to check variables and convert to numeric
-  for (i in 1: length(cnames)){
-    varname <- cnames[i]
-    var     <- pull(mod1_v2,varname)
-    mod1_v2[,cnames[i]] <- ifelse(numbers_only(var), as.numeric(as.character(var)), var)
-  }
-  
-  M1_V1.var   <- colnames(M1_V1)
-  M1_V2.var   <- colnames(M1_V2)
-  var.matched <- M1_V1.var[which(M1_V1.var %in% M1_V2.var)]
-  length(var.matched)  #1275 #1278 vars 01112023
-  
-  V1_only_vars <- colnames(M1_V1)[colnames(M1_V1) %!in% var.matched] #232 #229 01112023
-  V2_only_vars <- colnames(M1_V2)[colnames(M1_V2) %!in% var.matched] #253 #253 01112023
-  
-  length(M1_V1$Connect_ID[M1_V1$Connect_ID %in% M1_V2$Connect_ID])
-  #[1] 62 with completing both versions of M1
-  
-  common.IDs <- M1_V1$Connect_ID[M1_V1$Connect_ID %in% M1_V2$Connect_ID]
-  M1_V1_common <- mod1_v1[,var.matched]
-  
-  M1_V2_common <- mod1_v2[,var.matched]
-  M1_V1_common$version <- 1
-  M1_V2_common$version <- 2
-  
-  
-  #to check the empty columns in both version common part
-  empty_columns_V1 <- colSums(is.na(M1_V1_common) | M1_V1_common == "") == nrow(M1_V1_common)
-  empty_columns_V2 <- colSums(is.na(M1_V2_common) | M1_V2_common == "") == nrow(M1_V2_common)
-  length(colnames(M1_V1_common[,empty_columns_V1]))
-  #[1] "COMPLETED"               "COMPLETED_TS"            "D_317093647_D_206625031" "D_317093647_D_261863326"
-  #[5] "D_406011084_D_197994844" "D_406011084_D_380275309" "D_593017220_D_106010694" "D_593017220_D_434556295"
-  
-  length(colnames(M1_V2_common[,empty_columns_V2]))
-  # [1] "COMPLETED"                                                                   
-  # [2] "COMPLETED_TS"                                                                
-  # [3] "D_317093647_D_206625031"                                                     
-  # [4] "D_317093647_D_261863326"                                                     
-  # [5] "D_384881609_1_1_D_206625031_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1"
-  # [6] "D_483975329_1_1_D_206625031_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1_1"
-  # [7] "D_527057404_D_206625031"                                                     
-  # [8] "D_750420077_D_505282171"                                                     
-  # [9] "D_750420077_D_578416151"                                                     
-  # [10] "D_750420077_D_846483618"
-  
-  
-  m1_v1_only <- mod1_v1[,c("Connect_ID", V1_only_vars)]
-  m1_v2_only <- mod1_v2[,c("Connect_ID", V2_only_vars)]
-  m1_v1_only$version <- 1
-  m1_v2_only$version <- 2
-  #for (i in 1:length)
-  
-  #library(janitor)
-  
-  m1_common <- rbind(M1_V1_common,M1_V2_common)
-  #m1_common_v1 <- merge(m1_common, m1_v1_only, by="Connect_ID",all.x=TRUE)
-  #m1_combined_v1v2 <- merge(m1_common_v1,m1_v2_only,by="Connect_ID",all.x=TRUE)
-  
-  verson_dup <- m1_common[which(m1_common$Connect_ID %in% common.IDs),]
-  
-  M1_combined <- rbind(M1_V1_common)
-  # M1_combined <- 
-  M1 <- merge(verson_dup,m1_v1_only,by=c("Connect_ID","version"))
-  
-  ###to combine two versions of M1 excluding the version 1 from the 62 with two version outputs requested by Kowlsey 0111/2023
-  m1_common_nodup <- rbind(M1_V1_common[which(M1_V1_common$Connect_ID %!in% common.IDs),],M1_V2_common)
-  m1_common_v1_nodup <- merge(m1_common_nodup, m1_v1_only[which(M1_V1_common$Connect_ID %!in% common.IDs),], by="Connect_ID",all.x=TRUE)
-  m1_combined_v1v2_nodup <- merge(m1_common_v1_nodup,m1_v2_only[,(colnames(m1_v2_only) %!in% "version") ],by="Connect_ID",all.x=TRUE)
-
-    ###### if you want to combine the participants table as well
-  parts <- glue("SELECT Connect_ID, token, d_512820379, d_471593703, state_d_934298480, d_230663853,
-d_335767902, d_982402227, d_919254129, d_699625233, d_564964481, d_795827569, d_544150384,
-d_371067537, d_430551721, d_821247024, d_914594314,  d_827220437,
-d_949302066 , d_517311251, d_205553981, d_117249500  FROM `{project}.FlatConnect.participants_JP`
-where Connect_ID IS NOT NULL")
-  parts_table <- bq_project_query(project, parts)
-  parts_data <- bq_table_download(parts_table, bigint = "integer64")
-
-  parts_data$Connect_ID <- as.numeric(parts_data$Connect_ID) ###need to convert type- m1... is double and parts is character
-
-  merged_data <- left_join(m1_combined_v1v2_nodup, parts_data, by="Connect_ID")
-  merged_data
 }
 
 get_explanation <- function(x) {
