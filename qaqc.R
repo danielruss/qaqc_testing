@@ -10,6 +10,7 @@ library(stringr)
 library(glue)
 library(janitor)
 source("get_merged_module_1_data.R")
+source("get_merged_biospecimen_and_recruitment_data.R")
 
 ####################### Un-comment to use plummer api ##########################
 # #* heartbeat...
@@ -32,10 +33,10 @@ source("get_merged_module_1_data.R")
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### Biospecimen
-# QC_REPORT  <- "biospecimen"
-# rules_file <- "qc_rules_biospecimen.xlsx"
-# sheet      <- "TestMichelles"
-# tier       <- "prod"
+QC_REPORT  <- "biospecimen"
+rules_file <- "qc_rules_biospecimen.xlsx"
+sheet      <- "TestMichelles"
+tier       <- "prod"
 
 ### Recruitment
 # QC_REPORT  <- "recruitment"
@@ -44,10 +45,10 @@ source("get_merged_module_1_data.R")
 # tier       <- "prod"
 
 ### Module 1
-QC_REPORT  <- "module1"
-rules_file <- "qc_rules_module1.xlsx"
-sheet      <- NULL # "on_deck"
-tier       <- "prod"
+# QC_REPORT  <- "module1"
+# rules_file <- "qc_rules_module1.xlsx"
+# sheet      <- NULL # "on_deck"
+# tier       <- "prod"
 ################################################################################
 ################################################################################
 
@@ -563,6 +564,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
   
   if (length(data) > 1){
     join_keys <- c("Connect_ID", "token", "d_827220437")
+    print(paste0("566: ", data))
     data      <- data %>% reduce(left_join, by = join_keys)
     #data <- left_join(data[[1]], data[[2]], by =c("Connect_ID", "token", "d_827220437"))
   } else {
@@ -717,11 +719,7 @@ loadFromBQ <- TRUE
 if (loadFromBQ){
 
   if (QC_REPORT == "biospecimen") {
-    # Tables MUST BE listed in order appropriate for LEFT JOIN!!
-    tables              <- c('biospecimen_JP','participants_JP')
-    where_clause        <- "WHERE Connect_ID IS NOT NULL"
-    download_in_chunks  <- TRUE
-    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+    data <- get_merged_biospecimen_and_recruitment_data(project)
   } 
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
