@@ -8,7 +8,7 @@ get_merged_biospecimen_and_recruitment_data <- function(project) {
   SELECT
     *
   FROM
-    `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP`
+    `{project}.FlatConnect.participants_JP`
   WHERE
     CONNECT_ID IS NOT NULL),
 
@@ -16,7 +16,7 @@ get_merged_biospecimen_and_recruitment_data <- function(project) {
   SELECT
     *
   FROM
-    `nih-nci-dceg-connect-prod-6d04.FlatConnect.biospecimen_JP`)
+    `{project}.FlatConnect.biospecimen_JP`)
 
 SELECT
   *
