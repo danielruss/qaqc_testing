@@ -145,8 +145,8 @@ prepare_report <- function(data,l,ids){
   data %>% 
     mutate(site_id=data$d_827220437,
            site=dictionary_lookup(site_id),
-           invalid_values=!!sym(l$ConceptID),
-           invalid_values_lookup=dictionary_lookup(invalid_values),
+           invalid_values=as.character(!!sym(l$ConceptID)),
+           invalid_values_lookup=dictionary_lookup(!!sym(l$ConceptID)),
            value2="",
            date=l$date,
            ConceptID=l$ConceptID,
