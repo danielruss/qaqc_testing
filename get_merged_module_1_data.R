@@ -1,6 +1,6 @@
 # Merges module 1 version 1, module 1 version 2 and part of the participants
 # and handles participants who have completed
-get_merged_module1_data <- function(project) {
+get_merged_module_1_data <- function(project) {
   billing <- project
   recr_M1 <- bq_project_query(
     project,
