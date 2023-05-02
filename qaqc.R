@@ -33,10 +33,10 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### Biospecimen
-QC_REPORT  <- "biospecimen"
-rules_file <- "qc_rules_biospecimen.xlsx"
-sheet      <- "TestMichelles"
-tier       <- "prod"
+# QC_REPORT  <- "biospecimen"
+# rules_file <- "qc_rules_biospecimen.xlsx"
+# sheet      <- "on_deck" #"TestMichelles"
+# tier       <- "prod"
 
 ### Recruitment
 # QC_REPORT  <- "recruitment"
@@ -45,10 +45,10 @@ tier       <- "prod"
 # tier       <- "prod"
 
 ### Module 1
-# QC_REPORT  <- "module1"
-# rules_file <- "qc_rules_module1.xlsx"
-# sheet      <- NULL # "on_deck"
-# tier       <- "prod"
+QC_REPORT  <- "module1"
+rules_file <- "qc_rules_module1.xlsx"
+sheet      <- NULL # "on_deck"
+tier       <- "prod"
 ################################################################################
 ################################################################################
 
@@ -62,8 +62,7 @@ project    <- switch(tier,
                      stg  = "nih-nci-dceg-connect-stg-5519",
                      prod = "nih-nci-dceg-connect-prod-6d04")
 
-# Get data dictionary (Version provided by Nicole on Jan 19, 2023)
-dictionary <- rio::import("https://raw.githubusercontent.com/episphere/conceptGithubActions/master/aggregate.json",format = "json")
+dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
 #dl <-  dictionary %>% map(~.x[["Variable Name"]] %||% .x[["Variable Label"]]) %>% compact()
 
@@ -302,11 +301,17 @@ crossvalid <- crossvalidly(valid)
 na_or_valid <- na_ok(valid)
 na_or_crossvalid <- na_ok(crossvalid)
 
-# Custom R Expression
-custom <- function(data, ids, ...) {
+## The value of rules$Concept_ID must match that of rules$ValidValues [which is another CID]
+match_cid_values <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
-  failed <- data %>% filter(eval(parse(text=l$Qctest)))
+  # select all the invalid rows
+  failed <- data %>% filter( !!sym(l$ConceptID) != getCIDValue(ValidValues,data) )
+  l <- prepare_list_for_report(l)
+  prepare_report(failed,l,{{ids}})
 }
+crossvalid_match_cid_values <- crossvalidly(match_cid_values)
+na_or_match_cid_values <- na_ok(match_cid_values)
+na_or_crossvalid_match_cid_values <- na_ok(crossvalid_match_cid_values)
 
 ## Check that date is before other date
 validBeforeDate <- function(data,ids,...){
@@ -359,6 +364,26 @@ isNotPopulated <- function(data,ids,...){
 }
 crossvalidIsNotPopulated <- crossvalidly(isPopulated)
 
+# Filter values that cannot be converted to numeric
+isNumeric <- function(data,ids,...){
+  l=list(...) # Column names that are passed in ...
+  
+  # Try to convert value (can be string) to numeric, if as.numeric() returns NA, return false
+  # is_numeric("5.5") == TRUE
+  # is_numeric(5.5) == TRUE
+  # is_numeric("five point five") == FALSE
+  is_numeric <- function(x) !is.na(as.numeric(x))
+
+# select all the invalid rows
+failed <- data %>% filter(!is_numeric(!!sym(l$ConceptID)))
+l <- prepare_list_for_report(l)
+prepare_report(failed,l,{{ids}})
+}
+na_or_isNumeric <- na_ok(isNumeric)
+crossvalid_isNumeric <- crossvalidly(isNumeric)
+na_or_crossvalid_isNumeric <- na_ok(crossvalid_isNumeric)
+
+# Filter values that are not valid dates
 validDate <- function(data,ids,...){
   #message("... Running ValidDate")
   l=list(...)
@@ -451,8 +476,9 @@ has_less_than_or_equal_n_characters<-function(data,ids,...){
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
-na_or_has_less_than_or_equal_n_characters<-na_ok(has_less_than_or_equal_n_characters)
-crossvalid_has_less_than_or_equal_n_characters<- crossvalidly(has_less_than_or_equal_n_characters)
+na_or_has_less_than_or_equal_n_characters <-na_ok(has_less_than_or_equal_n_characters)
+crossvalid_has_less_than_or_equal_n_characters <- crossvalidly(has_less_than_or_equal_n_characters)
+na_or_crossvalid_has_less_than_or_equal_n_characters <- na_ok(crossvalid_has_less_than_or_equal_n_characters)
 
 # NOTE: This was needed to report bad rules
 find_errors <- function(rules,data){
@@ -497,6 +523,10 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(Qctype=="NA or valid") %>% pmap_dfr(na_or_valid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="is populated") %>% pmap_dfr(isPopulated,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="is not populated") %>% pmap_dfr(isNotPopulated,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="isNumeric") %>% pmap_dfr(isNumeric,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="crossValid1 isNumeric") %>% pmap_dfr(crossvalid_isNumeric,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or isNumeric") %>% pmap_dfr(na_or_isNumeric,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid1 isNumeric") %>% pmap_dfr(na_or_crossvalid_isNumeric,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid2") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid3") %>% pmap_dfr(crossvalid,data=data,ids={{ids}},date=run_date),
@@ -512,8 +542,10 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(Qctype=="NA or dateTime") %>% pmap_dfr(na_or_datetime,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or date") %>% pmap_dfr(na_or_date,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1 equal to char()") %>% pmap_dfr(crossvalid_has_n_characters,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid1 equal to char()") %>% pmap_dfr(crossvalid_has_n_characters,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or equal to char()") %>% pmap_dfr(na_or_has_n_characters,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1 equal to or less than char()") %>% pmap_dfr(crossvalid_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or crossValid1 equal to or less than char()") %>% pmap_dfr(na_or_crossvalid_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or equal to or less than char()") %>% pmap_dfr(na_or_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date)
   )
 }
@@ -719,7 +751,7 @@ loadFromBQ <- TRUE
 if (loadFromBQ){
 
   if (QC_REPORT == "biospecimen") {
-    data <- get_merged_biospecimen_and_recruitment_data(project)
+    data <- get_merged_biospecimen_and_recruitment_data(project, exclude_duplicates=TRUE)
   } 
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
@@ -749,59 +781,62 @@ rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%
 # Run QC report
 x <- runQC(data, rules, ids=Connect_ID) 
 
-# Convert arrays to strings so that they can be written to excel correctly, 
-# otherwise arrays of strings appear as blank cells in excel sheet
-x <- x %>% mutate(
-             site = map_chr(site,paste,collapse=", "),
-             ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
-             ValidValues = map_chr(ValidValues,paste,collapse = ", "),
-             ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
-             invalid_values_lookup = map_chr(invalid_values_lookup,paste,collapse = ", "),
-             CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
-             CrossVariableConceptID1_lookup= map_chr(CrossVariableConceptID1_lookup,paste,collapse = ", "),
-             CrossVariableConceptValidValue1= map_chr(CrossVariableConceptValidValue1,paste,collapse = ", "),
-             CrossVariableConceptValidValue1_lookup= map_chr(CrossVariableConceptValidValue1_lookup,paste,collapse = ", "),
-             CrossVariableConceptID2= map_chr(CrossVariableConceptID2,paste,collapse = ", "),
-             CrossVariableConceptID2_lookup= map_chr(CrossVariableConceptID2_lookup,paste,collapse = ", "),
-             CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
-             CrossVariableConceptValidValue2_lookup= map_chr(CrossVariableConceptValidValue2_lookup,paste,collapse = ", "),
-             CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
-             CrossVariableConceptID3_lookup= map_chr(CrossVariableConceptID3_lookup,paste,collapse = ", "),
-             CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
-             CrossVariableConceptValidValue3_lookup= map_chr(CrossVariableConceptValidValue3_lookup,paste,collapse = ", "),
-             CrossVariableConceptID4= map_chr(CrossVariableConceptID4,paste,collapse = ", "),
-             CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
-             CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
-             CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
-            ) 
-x <- x %>% get_explanation()
-
-# Alter column order
-col_order <- c("Connect_ID", "token", 
-               "site_id", "site", 
-               "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
-               "ValidValues", "ValidValues_lookup", "invalid_values",
-               "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
-               "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
-               "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
-               "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
-               "date", "explanation")
-x <- x[, col_order]
-
-# Write report and rules to separate sheets of excel file
-writexl::write_xlsx(list(report=x, rules=rules), report_fid)
-
-# Upload report to cloud storage if desired
-push_to_cloud_storage <- FALSE
-if (push_to_cloud_storage) {
-  # Authenticate with Google Storage and write report file to bucket
-  scope  <- c("https://www.googleapis.com/auth/cloud-platform")
-  bucket <- "gs://qaqc_reports"
-  token  <- token_fetch(scopes=scope)
-  gcs_auth(token=token)
-  gcs_upload(report_fid, bucket=bucket, name=report_fid)
+if (length(x)==0) {
+  print("No qc issues found. No report generated.")
+} else {
+  # Convert arrays to strings so that they can be written to excel correctly, 
+  # otherwise arrays of strings appear as blank cells in excel sheet
+  x <- x %>% mutate(
+    site = map_chr(site,paste,collapse=", "),
+    ConceptID_lookup = map_chr(ConceptID_lookup,paste,collapse=", "),
+    ValidValues = map_chr(ValidValues,paste,collapse = ", "),
+    ValidValues_lookup = map_chr(ValidValues_lookup,paste,collapse = ", "),
+    invalid_values_lookup = map_chr(invalid_values_lookup,paste,collapse = ", "),
+    CrossVariableConceptID1= map_chr(CrossVariableConceptID1,paste,collapse = ", "),
+    CrossVariableConceptID1_lookup= map_chr(CrossVariableConceptID1_lookup,paste,collapse = ", "),
+    CrossVariableConceptValidValue1= map_chr(CrossVariableConceptValidValue1,paste,collapse = ", "),
+    CrossVariableConceptValidValue1_lookup= map_chr(CrossVariableConceptValidValue1_lookup,paste,collapse = ", "),
+    CrossVariableConceptID2= map_chr(CrossVariableConceptID2,paste,collapse = ", "),
+    CrossVariableConceptID2_lookup= map_chr(CrossVariableConceptID2_lookup,paste,collapse = ", "),
+    CrossVariableConceptValidValue2= map_chr(CrossVariableConceptValidValue2,paste,collapse = ", "),
+    CrossVariableConceptValidValue2_lookup= map_chr(CrossVariableConceptValidValue2_lookup,paste,collapse = ", "),
+    CrossVariableConceptID3= map_chr(CrossVariableConceptID3,paste,collapse = ", "),
+    CrossVariableConceptID3_lookup= map_chr(CrossVariableConceptID3_lookup,paste,collapse = ", "),
+    CrossVariableConceptValidValue3= map_chr(CrossVariableConceptValidValue3,paste,collapse = ", "),
+    CrossVariableConceptValidValue3_lookup= map_chr(CrossVariableConceptValidValue3_lookup,paste,collapse = ", "),
+    CrossVariableConceptID4= map_chr(CrossVariableConceptID4,paste,collapse = ", "),
+    CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
+    CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
+    CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
+  ) %>% 
+    get_explanation()
+  
+  # Alter column order
+  col_order <- c("Connect_ID", "token", 
+                 "site_id", "site", 
+                 "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
+                 "ValidValues", "ValidValues_lookup", "invalid_values",
+                 "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
+                 "CrossVariableConceptID2", "CrossVariableConceptID2_lookup", "CrossVariableConceptValidValue2", "CrossVariableConceptValidValue2_lookup",
+                 "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
+                 "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
+                 "date", "explanation")
+  x <- x[, col_order]
+  
+  # Write report and rules to separate sheets of excel file
+  writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+  
+  # Upload report to cloud storage if desired
+  push_to_cloud_storage <- FALSE
+  if (push_to_cloud_storage) {
+    # Authenticate with Google Storage and write report file to bucket
+    scope  <- c("https://www.googleapis.com/auth/cloud-platform")
+    bucket <- "gs://qaqc_reports"
+    token  <- token_fetch(scopes=scope)
+    gcs_auth(token=token)
+    gcs_upload(report_fid, bucket=bucket, name=report_fid)
+  }
 }
-
 #}
 
 
