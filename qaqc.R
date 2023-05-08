@@ -35,20 +35,20 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
 # rules_file <- "qc_rules_biospecimen.xlsx"
-# sheet      <- "on_deck" #"TestMichelles"
+# sheet      <- NULL 
 # tier       <- "prod"
 
-### Recruitment
-# QC_REPORT  <- "recruitment"
-# rules_file <- "qc_rules_recruitment.xlsx"
-# sheet      <- NULL # "on_deck"
-# tier       <- "prod"
+## Recruitment
+QC_REPORT  <- "recruitment"
+rules_file <- "qc_rules_recruitment.xlsx"
+sheet      <- NULL
+tier       <- "prod"
 
 ### Module 1
-QC_REPORT  <- "module1"
-rules_file <- "qc_rules_module1.xlsx"
-sheet      <- NULL # "on_deck"
-tier       <- "prod"
+# QC_REPORT  <- "module1"
+# rules_file <- "qc_rules_module1.xlsx"
+# sheet      <- NULL 
+# tier       <- "prod"
 ################################################################################
 ################################################################################
 
