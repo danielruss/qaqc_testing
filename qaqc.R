@@ -9,7 +9,7 @@ library(readxl)
 library(stringr)
 library(glue)
 library(janitor)
-source("get_merged_module_1_datagit.R")
+source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
 
 ####################### Un-comment to use plummer api ##########################
