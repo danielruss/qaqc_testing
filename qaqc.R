@@ -35,20 +35,20 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
 # rules_file <- "qc_rules_biospecimen.xlsx"
-# sheet      <- NULL 
+# sheet      <- NULL
 # tier       <- "prod"
 
 ## Recruitment
-QC_REPORT  <- "recruitment"
-rules_file <- "qc_rules_recruitment.xlsx"
-sheet      <- NULL
-tier       <- "prod"
+# QC_REPORT  <- "recruitment"
+# rules_file <- "qc_rules_recruitment.xlsx"
+# sheet      <- NULL
+# tier       <- "prod"
 
 ### Module 1
-# QC_REPORT  <- "module1"
-# rules_file <- "qc_rules_module1.xlsx"
-# sheet      <- NULL 
-# tier       <- "prod"
+QC_REPORT  <- "module1"
+rules_file <- "qc_rules_module1.xlsx"
+sheet      <- NULL
+tier       <- "prod"
 ################################################################################
 ################################################################################
 
@@ -211,6 +211,7 @@ prepare_report <- function(data,l,ids){
            #CrossVariable4Value,
            CrossVariableConceptValidValue4,
            CrossVariableConceptValidValue4_lookup,
+           index,
            {{ids}})
 }
 
@@ -305,7 +306,9 @@ na_or_crossvalid <- na_ok(crossvalid)
 match_cid_values <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
   # select all the invalid rows
-  failed <- data %>% filter( !!sym(l$ConceptID) != getCIDValue(ValidValues,data) )
+  print('made it to 308')
+  failed <- data %>% filter( !!sym(l$ConceptID) != getCIDValue(l$ValidValues,data) )
+  print('made it to 310')
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -546,7 +549,11 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(Qctype=="NA or equal to char()") %>% pmap_dfr(na_or_has_n_characters,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossValid1 equal to or less than char()") %>% pmap_dfr(crossvalid_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="NA or crossValid1 equal to or less than char()") %>% pmap_dfr(na_or_crossvalid_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="NA or equal to or less than char()") %>% pmap_dfr(na_or_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date)
+    rules %>% filter(Qctype=="NA or equal to or less than char()") %>% pmap_dfr(na_or_has_less_than_or_equal_n_characters,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="match cid values") %>% pmap_dfr(match_cid_values,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="crossvalid match cid values") %>% pmap_dfr(crossvalid_match_cid_values,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="na or match cid values") %>% pmap_dfr(na_or_match_cid_values,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="na or crossvalid match cid values") %>% pmap_dfr(na_or_crossvalid_match_cid_values,data=data,ids={{ids}},date=run_date)
   )
 }
 
@@ -571,7 +578,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
       # print(vars_$column_name)
       
       # Define range of data to download per chunk
-      nvar   <- floor((length(vars_d$column_name))/5) # num vars to per query
+      nvar   <- floor((length(vars_d$column_name))/8) # num vars to per query
       start  <- seq(1,length(vars_d$column_name),nvar)
       end    <- length(vars_d$column_name)
       
@@ -583,7 +590,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64")
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=12)
       }
       
       # Join list of datasets into single dateset
@@ -596,7 +603,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
   
   if (length(data) > 1){
     join_keys <- c("Connect_ID", "token", "d_827220437")
-    print(paste0("566: ", data))
+    #print(paste0("566: ", data))
     data      <- data %>% reduce(left_join, by = join_keys)
     #data <- left_join(data[[1]], data[[2]], by =c("Connect_ID", "token", "d_827220437"))
   } else {
@@ -605,7 +612,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
 
 }
 
-get_explanation <- function(x) {
+get_explanation <- function(x, data) {
   x <- x %>%
     mutate(
       explanation = case_when(
@@ -737,7 +744,17 @@ get_explanation <- function(x) {
             glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues}], ",
                  "but they are [{x$invalid_values}] and [], respectively.")
           ) (x),
-        # getCIDValue(l$CrossVariableConceptID1,data)
+        
+        qc_test == "crossvalid match cid values" ~ 
+          (function(x, data)
+            glue("NA")
+            # print(paste0("indices: ", x$index), ",/n", "value: ", 
+            #       getCIDValue(x$ConceptID, data[where(data$token==x$token)]))
+            # print(paste0("x$ConceptID: ", getCIDValue(x$ConceptID,data), ", x$ValidValues: ", x$ConceptID))
+            # glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
+            #      "then [{x$ConceptID_lookup}] should have the same value as [{x$ValidValues_lookup}] or NA, ",
+            #      "but [{x$ConceptID_lookup}] is [{getCIDValue(x$ConceptID, data)}] and [{x$ValidValues_lookup}] is [{getCIDValue(x$ValidValues, data)}].")
+          ) (x, data),
         .default = "NA"
         
       )
@@ -762,7 +779,9 @@ if (loadFromBQ){
   else if (QC_REPORT == "module1") {
     data <- get_merged_module_1_data(project)
   }
-
+# Add a row of indices so that we can refer back to the originial position later
+# after filtering
+data$index <- 1:nrow(data)
   
 }else{
   data_file <- "data.json"
