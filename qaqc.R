@@ -9,28 +9,20 @@ library(readxl)
 library(stringr)
 library(glue)
 library(janitor)
+library(config)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
-
-####################### Un-comment to use plummer api ##########################
-# #* heartbeat...
-# #* @get /
-# #* @post /
-# function(){
-#   return("alive")
-# }
-# 
-# #* Runs STAGE QAQC
-# #* @get /qaqc-recruitment
-# #* @post /qaqc-recruitment
-# function() {
-
-
 
 ################################################################################
 ####################    Define Parameters Here     #############################
 ################################################################################
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
+
+### USE this if you are running on GCP Cloud Run and/or using plumber
+QC_REPORT  <- config::get("QC_REPORT")
+rules_file <- config::get("rules_file")
+tier       <- config::get("tier")
+sheet      <- NULL
 
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -38,17 +30,17 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 # sheet      <- NULL
 # tier       <- "prod"
 
-## Recruitment
+### Recruitment
 # QC_REPORT  <- "recruitment"
 # rules_file <- "qc_rules_recruitment.xlsx"
 # sheet      <- NULL
 # tier       <- "prod"
 
 ### Module 1
-QC_REPORT  <- "module1"
-rules_file <- "qc_rules_module1.xlsx"
-sheet      <- NULL
-tier       <- "prod"
+# QC_REPORT  <- "module1"
+# rules_file <- "qc_rules_module1.xlsx"
+# sheet      <- NULL
+# tier       <- "prod"
 ################################################################################
 ################################################################################
 
@@ -856,6 +848,3 @@ if (length(x)==0) {
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
   }
 }
-#}
-
-

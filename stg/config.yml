@@ -1,0 +1,11 @@
+default:
+  tier: stg
+biospecimen:
+  QC_REPORT: biospecimen
+  rules_file: qc_rules_biospecimen.xlsx
+recruitment:
+  QC_REPORT: recruitment
+  rules_file: qc_rules_recruitment.xlsx
+module1:
+  QC_REPORT: module1
+  rules_file: qc_rules_module1.xlsx
