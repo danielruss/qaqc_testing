@@ -24,7 +24,7 @@ write_to_gcs <- FALSE # write xlsx output locally by default
 QC_REPORT     <- config::get("QC_REPORT")
 rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
-write_to_gcs  <- config::get("push_to_gcs")
+write_to_gcs  <- config::get("write_to_gcs")
 bucket        <- config::get("bucket")
 sheet         <- NULL
 
