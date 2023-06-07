@@ -1,5 +1,5 @@
 FROM rocker/tidyverse:latest
-RUN install2.r rio plumber bigrquery googleCloudStorageR gargle janitor rlang config
+RUN install2.r rio plumber bigrquery googleCloudStorageR gargle janitor rlang config writexl
 COPY ["./qaqc.R", "./qaqc.R"]
 COPY ["./api.R",  "./api.R"]
 COPY ["./config.yml", "./config.yml"]
