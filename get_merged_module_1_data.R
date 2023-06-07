@@ -111,9 +111,9 @@ get_merged_module_1_data <- function(project) {
                       #library(janitor)
                       
                       m1_common        <- rbind(M1_V1_common,M1_V2_common)
-                      m1_common_v1     <- merge(m1_common, m1_v1_only, 
+                      m1_common_v1     <- base::merge(m1_common, m1_v1_only, 
                                                 by=c("Connect_ID","version"), all.x=TRUE)
-                      m1_combined_v1v2 <- merge(m1_common_v1, m1_v2_only,
+                      m1_combined_v1v2 <- base::merge(m1_common_v1, m1_v2_only,
                                                 by=c("Connect_ID","version"), all.x=TRUE)
                       m1_complete      <- m1_combined_v1v2[which(
                         m1_combined_v1v2$Connect_ID %in% 

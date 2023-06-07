@@ -14,6 +14,10 @@ function() {
 function() {
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
   source("qaqc.R", echo = TRUE)
+  Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
+  source("qaqc.R", echo = TRUE)
+  Sys.setenv(R_CONFIG_ACTIVE = "module1")
+  source("qaqc.R", echo = TRUE)
 }
 
 #* Runs QAQC for biospecimen data set
