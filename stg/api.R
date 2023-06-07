@@ -14,7 +14,7 @@ function() {
 function() {
   
   echo = FALSE # Set this to true when debugging
-  Print("Running QAQC...")
+  print("Running QAQC...")
   
   # Set config for recruitment and run QAQC
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
