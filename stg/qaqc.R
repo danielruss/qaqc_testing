@@ -20,11 +20,12 @@ write_to_gcs <- FALSE # write xlsx output locally by default
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-QC_REPORT     <- config::get("QC_REPORT")
-rules_file    <- config::get("rules_file")
-tier          <- config::get("tier")
-write_to_gcs  <- config::get("push_to_gcs")
-sheet         <- NULL
+# QC_REPORT     <- config::get("QC_REPORT")
+# rules_file    <- config::get("rules_file")
+# tier          <- config::get("tier")
+# write_to_gcs  <- config::get("push_to_gcs")
+# bucket.       <- config::get("bucket")
+# sheet         <- NULL
 
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -33,10 +34,12 @@ sheet         <- NULL
 # tier       <- "prod"
 
 ### Recruitment
-# QC_REPORT  <- "recruitment"
-# rules_file <- "qc_rules_recruitment.xlsx"
-# sheet      <- NULL
-# tier       <- "prod"
+QC_REPORT  <- "recruitment"
+rules_file <- "qc_rules_recruitment.xlsx"
+sheet      <- NULL
+tier       <- "stg"
+write_to_gcs <- TRUE
+bucket     <- "gs://qaqc_reports"
 
 ### Module 1
 # QC_REPORT  <- "module1"
@@ -836,10 +839,13 @@ if (length(x)==0) {
                  "date", "explanation")
   x <- x[, col_order]
   
-  print("QC report complete.")
+  # Write report and rules to separate sheets of excel file
+  writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+  print(glue("{report_fid} save to local drive."))
+  
   # Upload report to cloud storage if desired
   if (write_to_gcs) {
-    print("Uploading {report_fid} to {bucket}.")
+    print(glue("Uploading {report_fid} to {bucket}."))
     # Authenticate with Google Storage and write report file to bucket
     scope  <- c("https://www.googleapis.com/auth/cloud-platform")
     bucket <- "gs://qaqc_reports"
@@ -847,9 +853,5 @@ if (length(x)==0) {
     gcs_auth(token=token)
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
     print("Successfully uploaded to GCS Bucket.")
-  } else {
-    # Write report and rules to separate sheets of excel file
-    writexl::write_xlsx(list(report=x, rules=rules), report_fid)
-    print("{report_fid} save to local drive.")
-  }
+  } 
 }
