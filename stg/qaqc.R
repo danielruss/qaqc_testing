@@ -21,12 +21,12 @@ write_to_gcs <- FALSE # write xlsx output locally by default
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-# QC_REPORT     <- config::get("QC_REPORT")
-# rules_file    <- config::get("rules_file")
-# tier          <- config::get("tier")
-# write_to_gcs  <- config::get("push_to_gcs")
-# bucket.       <- config::get("bucket")
-# sheet         <- NULL
+QC_REPORT     <- config::get("QC_REPORT")
+rules_file    <- config::get("rules_file")
+tier          <- config::get("tier")
+write_to_gcs  <- config::get("push_to_gcs")
+bucket        <- config::get("bucket")
+sheet         <- NULL
 
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
