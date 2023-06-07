@@ -12,12 +12,23 @@ function() {
 #* @get /qaqc-all
 #* @post /qaqc-all
 function() {
+  
+  echo = FALSE # Set this to true when debugging
+  Print("Running QAQC...")
+  
+  # Set config for recruitment and run QAQC
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
-  source("qaqc.R", echo = TRUE)
+  source("qaqc.R", echo = echo)
+  
+  # Set config for biospecimen and run QAQC
   Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
-  source("qaqc.R", echo = TRUE)
+  source("qaqc.R", echo = echo)
+
+  # Set config for module 1 and run QAQC
   Sys.setenv(R_CONFIG_ACTIVE = "module1")
-  source("qaqc.R", echo = TRUE)
+  source("qaqc.R", echo = echo)
+  
+  return("All QAQC reports complete!")
 }
 
 #* Runs QAQC for recruitment data set
@@ -26,6 +37,7 @@ function() {
 function() {
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
   source("qaqc.R", echo = TRUE)
+  return("Recruitment QAQC complete!")
 }
 
 #* Runs QAQC for biospecimen data set
@@ -34,6 +46,7 @@ function() {
 function() {
   Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
   source("qaqc.R", echo = TRUE)
+  return("Biospecimen QAQC complete!")
 }
 
 #* Runs QAQC for module 1 data set
@@ -42,4 +55,5 @@ function() {
 function() {
   Sys.setenv(R_CONFIG_ACTIVE = "module1")
   source("qaqc.R", echo = TRUE)
+  return("Module 1 QAQC complete!")
 }

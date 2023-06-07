@@ -26,6 +26,7 @@ rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
 write_to_gcs  <- config::get("write_to_gcs")
 bucket        <- config::get("bucket")
+flag          <- config::get("flag")
 sheet         <- NULL
 
 ### Biospecimen
@@ -51,8 +52,10 @@ sheet         <- NULL
 ################################################################################
 
 # Name of output/report file
-report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
-                     "_",tier,"_",Sys.Date(),".xlsx")
+# report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
+#                      "_",tier,"_",Sys.Date(),".xlsx")
+report_fid <- 
+  glue("qc_report_{QC_REPORT}_{sheet}_{tier}_{flag}_{Sys.Date()}.xlsx")
 
 # Look-up table of project ids
 project    <- switch(tier,

@@ -2,6 +2,7 @@ default:
   tier: stg
   write_to_gcs: TRUE
   bucket: gs://qaqc_reports
+  flag: _export2box_
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
