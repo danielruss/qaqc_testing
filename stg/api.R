@@ -8,15 +8,23 @@ function() {
   return("alive")
 }
 
-#* Runs QAQC for recruitment data set
-#* @get /qaqc-recruitment
-#* @post /qaqc-recruitment
+#* Run all qaqc reports
+#* @get /qaqc-all
+#* @post /qaqc-all
 function() {
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
   source("qaqc.R", echo = TRUE)
   Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
   source("qaqc.R", echo = TRUE)
   Sys.setenv(R_CONFIG_ACTIVE = "module1")
+  source("qaqc.R", echo = TRUE)
+}
+
+#* Runs QAQC for recruitment data set
+#* @get /qaqc-recruitment
+#* @post /qaqc-recruitment
+function() {
+  Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
   source("qaqc.R", echo = TRUE)
 }
 
