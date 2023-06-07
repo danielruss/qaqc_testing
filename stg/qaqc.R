@@ -12,6 +12,7 @@ library(janitor)
 library(config)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
+write_to_gcs <- FALSE # write xlsx output locally by default
 
 ################################################################################
 ####################    Define Parameters Here     #############################
@@ -19,10 +20,11 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-QC_REPORT  <- config::get("QC_REPORT")
-rules_file <- config::get("rules_file")
-tier       <- config::get("tier")
-sheet      <- NULL
+QC_REPORT     <- config::get("QC_REPORT")
+rules_file    <- config::get("rules_file")
+tier          <- config::get("tier")
+write_to_gcs  <- config::get("push_to_gcs")
+sheet         <- NULL
 
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -834,17 +836,20 @@ if (length(x)==0) {
                  "date", "explanation")
   x <- x[, col_order]
   
-  # Write report and rules to separate sheets of excel file
-  writexl::write_xlsx(list(report=x, rules=rules), report_fid)
-  
+  print("QC report complete.")
   # Upload report to cloud storage if desired
-  push_to_cloud_storage <- FALSE
-  if (push_to_cloud_storage) {
+  if (write_to_gcs) {
+    print("Uploading {report_fid} to {bucket}.")
     # Authenticate with Google Storage and write report file to bucket
     scope  <- c("https://www.googleapis.com/auth/cloud-platform")
     bucket <- "gs://qaqc_reports"
     token  <- token_fetch(scopes=scope)
     gcs_auth(token=token)
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
+    print("Successfully uploaded to GCS Bucket.")
+  } else {
+    # Write report and rules to separate sheets of excel file
+    writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+    print("{report_fid} save to local drive.")
   }
 }
