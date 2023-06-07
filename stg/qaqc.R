@@ -35,12 +35,12 @@ write_to_gcs <- FALSE # write xlsx output locally by default
 # tier       <- "prod"
 
 ### Recruitment
-QC_REPORT  <- "recruitment"
-rules_file <- "qc_rules_recruitment.xlsx"
-sheet      <- NULL
-tier       <- "stg"
-write_to_gcs <- TRUE
-bucket     <- "gs://qaqc_reports"
+# QC_REPORT  <- "recruitment"
+# rules_file <- "qc_rules_recruitment.xlsx"
+# sheet      <- NULL
+# tier       <- "stg"
+# write_to_gcs <- TRUE
+# bucket     <- "gs://qaqc_reports"
 
 ### Module 1
 # QC_REPORT  <- "module1"
