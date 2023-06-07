@@ -55,7 +55,7 @@ sheet         <- NULL
 # report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
 #                      "_",tier,"_",Sys.Date(),".xlsx")
 report_fid <- 
-  glue("qc_report_{QC_REPORT}_{sheet}_{tier}_{flag}_{Sys.Date()}.xlsx")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(),".xlsx", sep="_")
 
 # Look-up table of project ids
 project    <- switch(tier,
