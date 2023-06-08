@@ -10,8 +10,10 @@ library(stringr)
 library(glue)
 library(janitor)
 library(config)
+library(writexl)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
+write_to_gcs <- FALSE # write xlsx output locally by default
 
 ################################################################################
 ####################    Define Parameters Here     #############################
@@ -19,10 +21,13 @@ source("get_merged_biospecimen_and_recruitment_data.R")
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-QC_REPORT  <- config::get("QC_REPORT")
-rules_file <- config::get("rules_file")
-tier       <- config::get("tier")
-sheet      <- NULL
+QC_REPORT     <- config::get("QC_REPORT")
+rules_file    <- config::get("rules_file")
+tier          <- config::get("tier")
+write_to_gcs  <- config::get("write_to_gcs")
+bucket        <- config::get("bucket")
+flag          <- config::get("flag")
+sheet         <- NULL
 
 ### Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -34,7 +39,9 @@ sheet      <- NULL
 # QC_REPORT  <- "recruitment"
 # rules_file <- "qc_rules_recruitment.xlsx"
 # sheet      <- NULL
-# tier       <- "prod"
+# tier       <- "stg"
+# write_to_gcs <- TRUE
+# bucket     <- "gs://qaqc_reports"
 
 ### Module 1
 # QC_REPORT  <- "module1"
@@ -45,8 +52,10 @@ sheet      <- NULL
 ################################################################################
 
 # Name of output/report file
-report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
-                     "_",tier,"_",Sys.Date(),".xlsx")
+# report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
+#                      "_",tier,"_",Sys.Date(),".xlsx")
+report_fid <-
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(),".xlsx", sep="_")
 
 # Look-up table of project ids
 project    <- switch(tier,
@@ -66,10 +75,10 @@ dictionary_lookup <- function(x){
   x=as.list(x)
   skel <- as.relistable(x)
   x <- unlist(x)
-  
-  x <- x %>% 
+
+  x <- x %>%
     str_split_i("d_", -1) %>% # Get last CID without "d_"
-    map(~dl[[.x]]) %>% 
+    map(~dl[[.x]]) %>%
     modify_if(is.null,~"NA")
   x <- relist(x,skel)
   class(x) <- "list"
@@ -86,15 +95,15 @@ convertToVector <- function(x){
 
 
 #### ==================== Code Really Starts here...
-# your %!in% function is not my favorite, but infix operator are cool so +1. I'm surprise 
-# your function works.  I changed the syntax a bit to make it slightly more standard. 
+# your %!in% function is not my favorite, but infix operator are cool so +1. I'm surprise
+# your function works.  I changed the syntax a bit to make it slightly more standard.
 # Be careful in using this pipes, which I think are much cooler and easier to read.
 `%!in%` <- function(x,y){ !`%in%`(x,y) }
 `%in|na%` <- function(x,y){ is.na(x) | x %in% y }
 
 # I'm not really happy with this function...  I would like to pass
 # in two vectors values and valid_values. This way we are not locked
-# into 3 columns.  Note: NA %in% NA returns true, so if we are cross 
+# into 3 columns.  Note: NA %in% NA returns true, so if we are cross
 # validating 1 variable, the NAs in v2 and v2 dont effect the results.
 crossValidate <- function(value1,valid_values1,value2,valid_values2,value3,valid_values3,value4,valid_values4){
   (value1 %in% valid_values1) & (value2 %in% valid_values2) & (value3 %in% valid_values3) & (value4 %in% valid_values4)
@@ -118,23 +127,23 @@ prepare_list_for_report<-function(arg_list){
   arg_list$CrossVariableConceptID1 <- arg_list$CrossVariableConceptID1 %||% ""
   arg_list$CrossVariable1Value <- arg_list$CrossVariable1Value %||% ""
   arg_list$CrossVariableConceptValidValue1 <- list(arg_list$CrossVariableConceptID1Value %||% "")
-  
+
   arg_list$CrossVariableConceptID2 <- arg_list$CrossVariableConceptID2 %||% ""
   arg_list$CrossVariable2Value <- arg_list$CrossVariable2Value %||% ""
   arg_list$CrossVariableConceptValidValue2 <- list(arg_list$CrossVariableConceptID2Value %||% "")
-  
+
   arg_list$CrossVariableConceptID3 <- arg_list$CrossVariableConceptID3 %||% ""
   arg_list$CrossVariable3Value <- arg_list$CrossVariable3Value %||% ""
   arg_list$CrossVariableConceptValidValue3 <- list(arg_list$CrossVariableConceptID3Value %||% "")
-  
+
   arg_list$CrossVariableConceptID4 <- arg_list$CrossVariableConceptID4 %||% ""
   arg_list$CrossVariable4Value <- arg_list$CrossVariable4Value %||% ""
   arg_list$CrossVariableConceptValidValue4 <- list(arg_list$CrossVariableConceptID4Value %||% "")
-  
+
   arg_list
 }
 prepare_report <- function(data,l,ids){
-  data %>% 
+  data %>%
     mutate(site_id=data$d_827220437,
            site=dictionary_lookup(site_id),
            invalid_values=as.character(!!sym(l$ConceptID)),
@@ -170,7 +179,7 @@ prepare_report <- function(data,l,ids){
            qc_test=l$Qctype
     )  %>%
     select(Connect_ID,
-           token, 
+           token,
            site_id,
            site,
            qc_test,
@@ -210,8 +219,8 @@ prepare_report <- function(data,l,ids){
 ## Adverb functions to be used to modify validation functions
 crossvalidly <- function(f){
   function(data,ids,...){
-    l = list(...)  
-    
+    l = list(...)
+
     rules_error <- FALSE
     error_msg <- ""
     tryCatch({
@@ -222,7 +231,7 @@ crossvalidly <- function(f){
       xv4_value <- getCIDValue(l$CrossVariableConceptID4,data)
     },error=function(e){
       rules_error <- TRUE
-      error_msg <- paste("Rules error: ",e) 
+      error_msg <- paste("Rules error: ",e)
       warning("Caught error during crossvalidation.",
               "\n\tConcept_ID:",l$ConceptID,
               "\n\tXV_ID1:",l$CrossVariableConceptID1,
@@ -230,10 +239,10 @@ crossvalidly <- function(f){
               "\n\tXV_ID3:",l$CrossVariableConceptID3,
               "\n\tXV_ID4:",l$CrossVariableConceptID4)
     })
-    
-    # JP NOTE: Everything in report rows passed the cross valid, so valid() will only 
+
+    # JP NOTE: Everything in report rows passed the cross valid, so valid() will only
     # run on the CIDs that passed the cross validation
-    report_rows <- data %>% 
+    report_rows <- data %>%
       ## add a column which is the value of the ConceptId of interest...
       mutate(value = cid_value,
              date=l$date,
@@ -249,7 +258,7 @@ crossvalidly <- function(f){
           xv4_value,l$CrossVariableConceptID4Value)
       )
     f(report_rows,ids={{ids}},...)
-    
+
   }
 }
 na_ok <- function(f){
@@ -259,7 +268,7 @@ na_ok <- function(f){
   }
 }
 
-## Validation Rules 
+## Validation Rules
 valid <- function(data,ids,...){
   #message("... Running valid")
   # ok, this is a difficult concept, but the conceptId is passed in as string.
@@ -269,7 +278,7 @@ valid <- function(data,ids,...){
   # we need to ask R if the value that the symbol points is in the set of valid values, not the symbol
   # itself.  So the !! dereferences the symbol to the value.
   l=list(...) # Column names that are passed in ...
-  
+
   ## select all the invalid rows. and save it in the "failed" tibble...
   # failed if ConceptID is in ValidValues
   #       --> If valid values starts with "c(", evaluate it as r code
@@ -280,14 +289,14 @@ valid <- function(data,ids,...){
       eval(parse(text = l$ValidValues)),
       l$ValidValues
     ))
-  
+
   l <- prepare_list_for_report(l)
-  
+
   ## quoted_conceptId = enquo(conceptId)
   ## for each failed row, get the Ids we want to place in the report...
   ## I also set the test to VALID
   ## you will need to set other values to as needed.
-  
+
   prepare_report(failed,l,{{ids}})
 }
 crossvalid <- crossvalidly(valid)
@@ -311,7 +320,7 @@ na_or_crossvalid_match_cid_values <- na_ok(crossvalid_match_cid_values)
 ## Check that date is before other date
 validBeforeDate <- function(data,ids,...){
   l=list(...)
-  
+
   # get value of cid (should be a date)
   date_to_check <- getCIDValue(l$ConceptID,data)
   # Converting to a date from a string
@@ -323,8 +332,8 @@ validBeforeDate <- function(data,ids,...){
   date_from_valid_vals <- coalesce(
     lubridate::ymd(date_from_valid_vals),
     lubridate::ymd_hms(date_from_valid_vals) )
-  
-  
+
+
   # should fail if NA or if date to check is later than valid values date
   failed <- data %>% filter( is.na(date_to_check) | date_to_check >= date_from_valid_vals )
   #l$ValidValues <- c(l$ValidValues, date_from_valid_vals)
@@ -338,10 +347,10 @@ na_or_crossvalidBeforeDate <- crossvalidly(na_or_validBeforeDate)
 # Filter values that are NA
 isPopulated <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
-  
+
   value_to_check <- getCIDValue(l$ConceptID,data)
   failed <- data %>% filter(is.na(value_to_check))
-  
+
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -350,10 +359,10 @@ crossvalidIsPopulated <- crossvalidly(isPopulated)
 # Filter values that are NA
 isNotPopulated <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
-  
+
   value_to_check <- getCIDValue(l$ConceptID,data)
   failed <- data %>% filter(!is.na(value_to_check))
-  
+
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -362,7 +371,7 @@ crossvalidIsNotPopulated <- crossvalidly(isPopulated)
 # Filter values that cannot be converted to numeric
 isNumeric <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
-  
+
   # Try to convert value (can be string) to numeric, if as.numeric() returns NA, return false
   # is_numeric("5.5") == TRUE
   # is_numeric(5.5) == TRUE
@@ -382,7 +391,7 @@ na_or_crossvalid_isNumeric <- na_ok(crossvalid_isNumeric)
 validDate <- function(data,ids,...){
   #message("... Running ValidDate")
   l=list(...)
-  
+
   symbol_conceptId = sym(l$ConceptID)
   ### check that the format is yyyymmdd
   suppressWarnings(
@@ -391,7 +400,7 @@ validDate <- function(data,ids,...){
         lubridate::ymd(!!symbol_conceptId ),
         lubridate::ymd_hms(!!symbol_conceptId) )) )
   )
-  # make sure elements needed in the report are not NULL ... 
+  # make sure elements needed in the report are not NULL ...
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -400,28 +409,28 @@ crossvalidDate = crossvalidly(validDate)
 
 validDateOnly <- function(data,ids,...){
   l=list(...)
-  
+
   symbol_conceptId = sym(l$ConceptID)
   ### check that the format is yyyymmdd
   suppressWarnings(
     failed <- data %>% filter(is.na(lubridate::ymd(!!symbol_conceptId )))
   )
-  
-  # make sure elements needed in the report are not NULL ... 
+
+  # make sure elements needed in the report are not NULL ...
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
 validDateTime <- function(data,ids,...){
   #message("... Running ValidDateTime")
   l=list(...)
-  
+
   symbol_conceptId = sym(l$ConceptID)
   ### check that the format is yyyymmdd
   suppressWarnings(
     failed <- data %>% filter(is.na(lubridate::ymd_hms(!!symbol_conceptId )))
   )
-  
-  # make sure elements needed in the report are not NULL ... 
+
+  # make sure elements needed in the report are not NULL ...
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -430,13 +439,13 @@ na_or_datetime <- na_ok(validDateTime)
 validAge <- function(data,ids,...){
   #message("... Running ValidAge")
   l=list(...)
-  
+
   ### need to make the column an integer and check that the age is between 0-100
   suppressWarnings(
-    failed <- data %>% mutate(tmpcol = as.integer(!!sym(l$ConceptID))) %>% 
+    failed <- data %>% mutate(tmpcol = as.integer(!!sym(l$ConceptID))) %>%
       filter( is.na(tmpcol) | tmpcol<=0 | tmpcol >=100 )
   )
-  # make sure elements needed in the report are not NULL ... 
+  # make sure elements needed in the report are not NULL ...
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -455,7 +464,7 @@ has_n_characters<-function(data,ids,...){
   #message("... Running has_n_characters ")
   l=list(...)
   #message("char len=",l$ValidValues)
-  
+
   failed <- data %>% filter( nchar(!!sym(l$ConceptID)) != as.integer(l$ValidValues))
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
@@ -479,7 +488,7 @@ na_or_crossvalid_has_less_than_or_equal_n_characters <- na_ok(crossvalid_has_les
 find_errors <- function(rules,data){
   rules %>% mutate(
     cid_not_in_data=ConceptID %!in% names(data),
-    bad_xv1_cid = !CrossVariableConceptID1 %in|na% names(data), 
+    bad_xv1_cid = !CrossVariableConceptID1 %in|na% names(data),
     bad_xv2_cid = !CrossVariableConceptID2 %in|na% names(data),
     bad_xv3_cid = !CrossVariableConceptID3 %in|na% names(data),
     bad_xv4_cid = !CrossVariableConceptID4 %in|na% names(data),
@@ -502,14 +511,14 @@ report_bad_rules <- function(...){
 
 runQC <- function(data, rules, QC_report_location,ids){
   run_date=Sys.time()
-  
+
   rules <- find_errors(rules,data)
-  bad_rules <- rules %>% filter(nchar(error)>0) 
+  bad_rules <- rules %>% filter(nchar(error)>0)
   filtered_rules <- rules %>% filter(!is.na(Qctype) & nchar(error)==0)
   rules <- filtered_rules %>% select(!error)
-  
+
   bind_rows(
-    bad_rules %>% pmap_dfr(report_bad_rules,date=run_date), 
+    bad_rules %>% pmap_dfr(report_bad_rules,date=run_date),
     rules %>% filter(Qctype=="valid") %>% pmap_dfr(valid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="valid before date()") %>% pmap_dfr(validBeforeDate,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossvalid before date()") %>% pmap_dfr(crossvalidBeforeDate,data=data,ids={{ids}},date=run_date),
@@ -550,30 +559,30 @@ runQC <- function(data, rules, QC_report_location,ids){
 }
 
 loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
-  
+
   data <- list()
   for (table in tables) {
-    
+
     if (!download_in_chunks) {
-      
+
       sql <- sprintf("SELECT token, Connect_ID, * FROM `%s.%s` %s", project, table, where_clause)
       tb  <- bq_project_query(project, query=sql)
       data[[table]] <- bq_table_download(tb, bigint = c("character"))
-      
+
     } else {
-      
+
       query  <- sprintf("SELECT * FROM `%s.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='%s'", project, table)
       vars   <- bq_project_query(project, query=query)
       vars_  <- bigrquery::bq_table_download(vars,bigint = "integer64")
       vars_d <- vars_[grepl("d_",vars_$column_name),]
       # print(paste0(table,' has these variables: '))
       # print(vars_$column_name)
-      
+
       # Define range of data to download per chunk
       nvar   <- floor((length(vars_d$column_name))/8) # num vars to per query
       start  <- seq(1,length(vars_d$column_name),nvar)
       end    <- length(vars_d$column_name)
-      
+
       # Loop through groups of columns and build up bq_data dataset
       bq_data <- list()
       for (i in (1:length(start)))  {
@@ -584,15 +593,15 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         tmp <- bq_project_query(project, query=q)
         bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=12)
       }
-      
+
       # Join list of datasets into single dateset
       join_keys     <- c("token", "Connect_ID")
       data[[table]] <- bq_data %>% reduce(inner_join, by = join_keys)
-      
+
     }
-    
+
   }
-  
+
   if (length(data) > 1){
     join_keys <- c("Connect_ID", "token", "d_827220437")
     #print(paste0("566: ", data))
@@ -609,37 +618,37 @@ get_explanation <- function(x, data) {
     mutate(
       explanation = case_when(
         qc_test == "valid" ~
-          (function(x) 
+          (function(x)
             glue("[{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
             ) (x),
-        
-        qc_test == "NA or valid" ~ 
+
+        qc_test == "NA or valid" ~
           (function(x)
             glue("[{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
            ) (x),
 
-        qc_test == "crossValid1" ~ 
+        qc_test == "crossValid1" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "crossValid2" ~ 
+
+        qc_test == "crossValid2" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}]",
                  " & [{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
                  "then [{x$ConceptID_lookup}], should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "crossValid3" ~ 
+
+        qc_test == "crossValid3" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}],",
                     "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}] ",
                   "& [{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "crossValid4" ~ 
+
+        qc_test == "crossValid4" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                     "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
@@ -647,29 +656,29 @@ get_explanation <- function(x, data) {
                   "& [{x$CrossVariableConceptID4_lookup}] is [{x$CrossVariableConceptValidValue4_lookup}], ",
                   "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}], but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "NA or crossValid1" ~ 
+
+        qc_test == "NA or crossValid1" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
             "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "NA or crossValid2" ~ 
+
+        qc_test == "NA or crossValid2" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
                   "& [{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
                   "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "NA or crossValid3" ~ 
+
+        qc_test == "NA or crossValid3" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                     "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}] ",
                   "& [{x$CrossVariableConceptID3_lookup}] is [{x$CrossVariableConceptValidValue3_lookup}], ",
                   "then [{x$ConceptID_lookup}] should be [{x$ValidValues_lookup}] or NA, but it's [{x$invalid_values_lookup}].")
           ) (x),
-        
-        qc_test == "NA or crossValid4" ~ 
+
+        qc_test == "NA or crossValid4" ~
           (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                     "[{x$CrossVariableConceptID2_lookup}] is [{x$CrossVariableConceptValidValue2_lookup}], ",
@@ -679,68 +688,68 @@ get_explanation <- function(x, data) {
           ) (x),
 
         qc_test == "is populated" ~ (function(x) glue("[{x$ConceptID_lookup}] should be populated, but it's missing.")) (x),
-        
-        qc_test == "crossValid1 equal to char()" ~ 
-          (function(x) 
+
+        qc_test == "crossValid1 equal to char()" ~
+          (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be a string of length [{x$ValidValues}], ",
                  "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
-        
-        qc_test == "NA or equal to char()" ~ 
-          (function(x) 
+
+        qc_test == "NA or equal to char()" ~
+          (function(x)
             glue("[{x$ConceptID_lookup}] should either be NA or a string of length [{x$ValidValues}], ",
                  "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
-        
-        qc_test == "crossValid1 equal to or less than char()" ~ 
-          (function(x) 
+
+        qc_test == "crossValid1 equal to or less than char()" ~
+          (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be a string of length [{x$ValidValues}] or less, ",
                  "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
            ) (x),
-        
-        qc_test == "NA or equal to or less than char()" ~ 
-          (function(x) 
+
+        qc_test == "NA or equal to or less than char()" ~
+          (function(x)
             glue("[{x$ConceptID_lookup}] should be NA or a string of length [{x$ValidValues}] or less, ",
                  "but it's [{x$invalid_values}] with length [{length(x$invalid_values)}].")
           ) (x),
-        
-        qc_test == "crossValid1Date" ~ 
-          (function(x) 
+
+        qc_test == "crossValid1Date" ~
+          (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be a valid date, but it's [{x$invalid_values}]")
-           ) (x), 
-        
-        qc_test == "crossValid1NotNA" ~ 
-          (function(x) 
+           ) (x),
+
+        qc_test == "crossValid1NotNA" ~
+          (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] must not be NA, but it's [{x$invalid_values_lookup}]")
             ) (x),
-        
-        qc_test == "NA or crossvalid before date()" ~ 
-          (function(x) 
+
+        qc_test == "NA or crossvalid before date()" ~
+          (function(x)
             glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}], ",
                  "then [{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
                  "but they are [{x$invalid_values}] and [], respectively.")
             ) (x),
-        
-        qc_test == "NA or valid before date()" ~ 
-          (function(x) 
+
+        qc_test == "NA or valid before date()" ~
+          (function(x)
             glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues_lookup}] or NA, ",
                  "but they are [{x$invalid_values}] and [], respectively.")
             ) (x),
-        
-        qc_test == "valid before date()" ~ 
-          (function(x) 
+
+        qc_test == "valid before date()" ~
+          (function(x)
             glue("[{x$ConceptID_lookup}] should be before [{x$ValidValues}], ",
                  "but they are [{x$invalid_values}] and [], respectively.")
           ) (x),
-        
-        qc_test == "crossvalid match cid values" ~ 
+
+        qc_test == "crossvalid match cid values" ~
           (function(x, data)
             glue("NA")
-            # print(paste0("indices: ", x$index), ",/n", "value: ", 
+            # print(paste0("indices: ", x$index), ",/n", "value: ",
             #       getCIDValue(x$ConceptID, data[where(data$token==x$token)]))
             # print(paste0("x$ConceptID: ", getCIDValue(x$ConceptID,data), ", x$ValidValues: ", x$ConceptID))
             # glue("If [{x$CrossVariableConceptID1_lookup}] is [{x$CrossVariableConceptValidValue1_lookup}] ",
@@ -748,7 +757,7 @@ get_explanation <- function(x, data) {
             #      "but [{x$ConceptID_lookup}] is [{getCIDValue(x$ConceptID, data)}] and [{x$ValidValues_lookup}] is [{getCIDValue(x$ValidValues, data)}].")
           ) (x, data),
         .default = "NA"
-        
+
       )
     )
 }
@@ -761,7 +770,7 @@ if (loadFromBQ){
 
   if (QC_REPORT == "biospecimen") {
     data <- get_merged_biospecimen_and_recruitment_data(project, exclude_duplicates=TRUE)
-  } 
+  }
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
     where_clause        <- ""
@@ -774,14 +783,14 @@ if (loadFromBQ){
 # Add a row of indices so that we can refer back to the originial position later
 # after filtering
 data$index <- 1:nrow(data)
-  
+
 }else{
   data_file <- "data.json"
   data      <- rio::import(data_file) %>% tibble::as_tibble()
 }
 
 ## I need to load the rules file....
-rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%  
+rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%
   mutate(ValidValues=map(ValidValues,convertToVector),
          CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
          CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
@@ -790,12 +799,12 @@ rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
-x <- runQC(data, rules, ids=Connect_ID) 
+x <- runQC(data, rules, ids=Connect_ID)
 
 if (length(x)==0) {
   print("No qc issues found. No report generated.")
 } else {
-  # Convert arrays to strings so that they can be written to excel correctly, 
+  # Convert arrays to strings so that they can be written to excel correctly,
   # otherwise arrays of strings appear as blank cells in excel sheet
   x <- x %>% mutate(
     site = map_chr(site,paste,collapse=", "),
@@ -819,12 +828,12 @@ if (length(x)==0) {
     CrossVariableConceptID4_lookup= map_chr(CrossVariableConceptID4_lookup,paste,collapse = ", "),
     CrossVariableConceptValidValue4= map_chr(CrossVariableConceptValidValue4,paste,collapse = ", "),
     CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
-  ) %>% 
+  ) %>%
     get_explanation()
-  
+
   # Alter column order
-  col_order <- c("Connect_ID", "token", 
-                 "site_id", "site", 
+  col_order <- c("Connect_ID", "token",
+                 "site_id", "site",
                  "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
                  "ValidValues", "ValidValues_lookup", "invalid_values",
                  "CrossVariableConceptID1", "CrossVariableConceptID1_lookup", "CrossVariableConceptValidValue1", "CrossVariableConceptValidValue1_lookup",
@@ -833,18 +842,20 @@ if (length(x)==0) {
                  "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
                  "date", "explanation")
   x <- x[, col_order]
-  
+
   # Write report and rules to separate sheets of excel file
   writexl::write_xlsx(list(report=x, rules=rules), report_fid)
-  
+  print(glue("{report_fid} save to local drive."))
+
   # Upload report to cloud storage if desired
-  push_to_cloud_storage <- FALSE
-  if (push_to_cloud_storage) {
+  if (write_to_gcs) {
+    print(glue("Uploading {report_fid} to {bucket}."))
     # Authenticate with Google Storage and write report file to bucket
     scope  <- c("https://www.googleapis.com/auth/cloud-platform")
     bucket <- "gs://qaqc_reports"
     token  <- token_fetch(scopes=scope)
     gcs_auth(token=token)
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
+    print("Successfully uploaded to GCS Bucket.")
   }
 }
