@@ -1,5 +1,12 @@
 default:
   tier: prod
+  project_id: "nih-nci-dceg-connect-prod-6d04"
+  project_number: "155089172944"
+  write_to_gcs: TRUE
+  bucket: gs://qaqc_reports
+  box_app: NCI_BOX_GCP_CONNECT4CANCER_PROD
+  box_folder: "211674408263"
+  flag: export2box
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx

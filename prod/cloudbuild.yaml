@@ -1,12 +1,12 @@
 # cloudbuild.yaml
 #
 steps:
-  
+
   # Build the container image
 - name: 'gcr.io/cloud-builders/docker'
-args: ['build','-t', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA', '.']
-dir: 'prod'
+args: ['build','-t', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA',  '-f', 'stg/Dockerfile', '.']
 timeout: 1200s
+#dir: 'prod'
 
 # Push the container image to Container Registry
 - name: 'gcr.io/cloud-builders/docker'
