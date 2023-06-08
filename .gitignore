@@ -1,10 +1,12 @@
+.Rapp.history
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
 qaqc_testing.Rproj
 qc_out.xlsx
-olds/
+Documentation/
 recruitment/.DS_Store
 recruitment/cloud_run_stg/~$*
 *.DS_Store
+*qc_report

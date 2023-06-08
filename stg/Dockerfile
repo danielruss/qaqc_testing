@@ -2,7 +2,7 @@ FROM rocker/tidyverse:latest
 RUN install2.r rio plumber bigrquery googleCloudStorageR gargle janitor rlang config writexl
 COPY ["./qaqc.R", "./qaqc.R"]
 COPY ["./api.R",  "./api.R"]
-COPY ["./config.yml", "./config.yml"]
+COPY ["./stg/config.yml", "./config.yml"] # copy config.yml from local stg directory to main directory in cloud run
 COPY ["./get_merged_module_1_data.R", "./get_merged_module_1_data.R"]
 COPY ["./get_merged_biospecimen_and_recruitment_data.R", "./get_merged_biospecimen_and_recruitment_data.R"]
 COPY ["./qc_rules_recruitment.xlsx", "./qc_rules_recruitment.xlsx"]
