@@ -3,18 +3,18 @@ steps:
 
 # Build the container image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build','-t', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA',  '-f', 'stg/Dockerfile', '.']
+  args: ['build','-t', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA',  '-f', 'stg/Dockerfile', '.']
   timeout: 1200s
 
 # Push the container image to Container Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA']
+  args: ['push', 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA']
 
 # Deploy container image to Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
-  args: ['run','deploy','generic-qaqc-api', '--image=gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA', '--cpu=2','--memory=8192Mi', '--region=us-central1', '--service-account=qa-qc-prod@nih-nci-dceg-connect-prod-6d04.iam.gserviceaccount.com']
+  args: ['run','deploy','generic-qaqc', '--image=gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA', '--cpu=2','--memory=8192Mi', '--region=us-central1', '--service-account=qa-qc-prod@nih-nci-dceg-connect-prod-6d04.iam.gserviceaccount.com']
 options:
   logging: CLOUD_LOGGING_ONLY
 images:
-  - 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA'
+  - 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA'
