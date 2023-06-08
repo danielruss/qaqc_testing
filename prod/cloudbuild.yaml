@@ -14,6 +14,7 @@ steps:
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run','deploy','generic-qaqc-api', '--image=gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA', '--cpu=2','--memory=8192Mi', '--region=us-central1', '--service-account=qa-qc-prod@nih-nci-dceg-connect-prod-6d04.iam.gserviceaccount.com']
-
+options:
+  logging: CLOUD_LOGGING_ONLY
 images:
   - 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc-api:$COMMIT_SHA'
