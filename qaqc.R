@@ -14,6 +14,10 @@ library(writexl)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
 write_to_gcs <- FALSE # write xlsx output locally by default
+flag <- ""
+
+#Authenticate to bigrquery
+bigrquery::bq_auth()
 
 ################################################################################
 ####################    Define Parameters Here     #############################
@@ -21,29 +25,29 @@ write_to_gcs <- FALSE # write xlsx output locally by default
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-QC_REPORT     <- config::get("QC_REPORT")
-rules_file    <- config::get("rules_file")
-tier          <- config::get("tier")
-write_to_gcs  <- config::get("write_to_gcs")
-bucket        <- config::get("bucket")
-flag          <- config::get("flag")
-sheet         <- NULL
+# QC_REPORT     <- config::get("QC_REPORT")
+# rules_file    <- config::get("rules_file")
+# tier          <- config::get("tier")
+# write_to_gcs  <- config::get("write_to_gcs")
+# bucket        <- config::get("bucket")
+# flag          <- config::get("flag")
+# sheet         <- NULL
 
-### Biospecimen
+# ## Biospecimen
 # QC_REPORT  <- "biospecimen"
 # rules_file <- "qc_rules_biospecimen.xlsx"
 # sheet      <- NULL
 # tier       <- "prod"
 
 ### Recruitment
-# QC_REPORT  <- "recruitment"
-# rules_file <- "qc_rules_recruitment.xlsx"
-# sheet      <- NULL
-# tier       <- "stg"
+QC_REPORT  <- "recruitment"
+rules_file <- "qc_rules_recruitment.xlsx"
+sheet      <- NULL
+tier       <- "prod"
 # write_to_gcs <- TRUE
 # bucket     <- "gs://qaqc_reports"
 
-### Module 1
+## Module 1
 # QC_REPORT  <- "module1"
 # rules_file <- "qc_rules_module1.xlsx"
 # sheet      <- NULL
@@ -591,7 +595,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=12)
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=2000)
       }
 
       # Join list of datasets into single dateset
