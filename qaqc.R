@@ -25,13 +25,13 @@ bigrquery::bq_auth()
 # For QC_REPORT, select "recruitment", "biospecimen" or "module1"
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
-# QC_REPORT     <- config::get("QC_REPORT")
-# rules_file    <- config::get("rules_file")
-# tier          <- config::get("tier")
-# write_to_gcs  <- config::get("write_to_gcs")
-# bucket        <- config::get("bucket")
-# flag          <- config::get("flag")
-# sheet         <- NULL
+QC_REPORT     <- config::get("QC_REPORT")
+rules_file    <- config::get("rules_file")
+tier          <- config::get("tier")
+write_to_gcs  <- config::get("write_to_gcs")
+bucket        <- config::get("bucket")
+flag          <- config::get("flag")
+sheet         <- NULL
 
 # ## Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -40,10 +40,10 @@ bigrquery::bq_auth()
 # tier       <- "prod"
 
 ### Recruitment
-QC_REPORT  <- "recruitment"
-rules_file <- "qc_rules_recruitment.xlsx"
-sheet      <- NULL
-tier       <- "prod"
+# QC_REPORT  <- "recruitment"
+# rules_file <- "qc_rules_recruitment.xlsx"
+# sheet      <- NULL
+# tier       <- "prod"
 # write_to_gcs <- TRUE
 # bucket     <- "gs://qaqc_reports"
 
