@@ -33,7 +33,7 @@ bucket        <- config::get("bucket")
 flag          <- config::get("flag")
 sheet         <- NULL
 
-### Biospecimen
+# ## Biospecimen
 # QC_REPORT  <- "biospecimen"
 # rules_file <- "qc_rules_biospecimen.xlsx"
 # sheet      <- NULL
@@ -43,11 +43,11 @@ sheet         <- NULL
 # QC_REPORT  <- "recruitment"
 # rules_file <- "qc_rules_recruitment.xlsx"
 # sheet      <- NULL
-# tier       <- "stg"
+# tier       <- "prod"
 # write_to_gcs <- TRUE
 # bucket     <- "gs://qaqc_reports"
 
-### Module 1
+## Module 1
 # QC_REPORT  <- "module1"
 # rules_file <- "qc_rules_module1.xlsx"
 # sheet      <- NULL
