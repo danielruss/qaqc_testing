@@ -13,7 +13,7 @@ library(config)
 library(writexl)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
-write_to_gcs <- FALSE # write xlsx output locally by default
+write_to_gcs <- TRUE # write xlsx output locally by default
 flag <- ""
 
 #Authenticate to bigrquery
@@ -38,20 +38,21 @@ sheet         <- NULL
 # rules_file <- "qc_rules_biospecimen.xlsx"
 # sheet      <- NULL
 # tier       <- "prod"
+# write_to_gcs <- FALSE
 
 ### Recruitment
 # QC_REPORT  <- "recruitment"
 # rules_file <- "qc_rules_recruitment.xlsx"
 # sheet      <- NULL
 # tier       <- "prod"
-# write_to_gcs <- TRUE
-# bucket     <- "gs://qaqc_reports"
+# write_to_gcs <- FALSE
 
 ## Module 1
 # QC_REPORT  <- "module1"
 # rules_file <- "qc_rules_module1.xlsx"
 # sheet      <- NULL
 # tier       <- "prod"
+# write_to_gcs <- FALSE
 ################################################################################
 ################################################################################
 
