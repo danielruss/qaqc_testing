@@ -8,12 +8,14 @@ get_merged_module_2_data <- function(project) {
   library(glue)
   library(bigrquery)
 
+
   `%!in%` <- function(x,y){ !`%in%`(x,y) }
 
   billing <- project
 
   ##517311251 Date/time Status of Completion of Background and Overall Health [SrvBOH_TmComplete_v1r0]
   ##949302066 Flag for Baseline Module Background and Overall Health          [SrvBOH_BaseStatus_v1r0]
+
   recr_M1 <- bq_project_query(
     project,
     query=glue(
@@ -37,6 +39,7 @@ get_merged_module_2_data <- function(project) {
   #Only these variables carry over from mod1 into mod2:
   #sex, sex2, gen, work
   #Going to see if only these are selected, if it will allow the automation to run
+
   sql_M1_1 <- bq_project_query(
     project,
     query = glue(
@@ -232,5 +235,6 @@ get_merged_module_2_data <- function(project) {
   module2= left_join(M2_complete_nodup, merged,  by="Connect_ID")
 
   data_tib_m2 <- as_tibble(module2)
+
   return(data_tib_m2)
 }

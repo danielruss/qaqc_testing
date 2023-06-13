@@ -10,7 +10,6 @@ get_merged_biospecimen_and_recruitment_data <-
 
   data_query <- bq_project_query(project, query = glue(sql1))
   data <- bq_table_download(data_query, bigint = "integer64", page_size = 1000)
-
   print(glue("length data: {length(data)}"))
 
   if (exclude_duplicates==TRUE) {
