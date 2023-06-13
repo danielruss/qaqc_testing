@@ -10,3 +10,5 @@ recruitment/.DS_Store
 recruitment/cloud_run_stg/~$*
 *.DS_Store
 *qc_report*
+~*
+.*
