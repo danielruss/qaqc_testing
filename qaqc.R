@@ -591,7 +591,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=12)
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=2000)
       }
 
       # Join list of datasets into single dateset
