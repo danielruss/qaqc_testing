@@ -856,7 +856,6 @@ if (length(x)==0) {
     print(glue("Uploading {report_fid} to {bucket}."))
     # Authenticate with Google Storage and write report file to bucket
     scope  <- c("https://www.googleapis.com/auth/cloud-platform")
-    bucket <- "gs://qaqc_reports"
     token  <- token_fetch(scopes=scope)
     gcs_auth(token=token)
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
