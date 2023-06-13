@@ -40,7 +40,7 @@ def main(bucket_name=bucket_name, project=project):
     blob_list = [blob.name for blob in blobs]
 
     # Get file names from bucket that have xlsx and other appropriate tags
-    substrings_to_check = ['recruitment', 'rules_range','.xlsx']
+    substrings_to_check = ['recruitment', 'rules','.xlsx']
     xlsx_list = [fname for fname in blob_list if check_substrings(fname, substrings_to_check)]
 
     # Loop thru blobs, download them as bytes, read as df, append to list
