@@ -13,7 +13,7 @@ function() {
 #* @post /qaqc-all
 function() {
 
-  echo = FALSE # Set this to true when debugging
+  echo = TRUE # Set this to TRUE when debugging
   message("Running QAQC...")
 
   # Set config for recruitment and run QAQC
