@@ -13,7 +13,11 @@ library(config)
 library(writexl)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
-write_to_gcs <- TRUE # write xlsx output locally by default
+write_to_gcs <- FALSE # write xlsx output locally by default
+flag <- ""
+
+#Authenticate to bigrquery
+bigrquery::bq_auth()
 
 ################################################################################
 ####################    Define Parameters Here     #############################
