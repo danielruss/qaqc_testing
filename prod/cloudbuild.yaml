@@ -13,7 +13,7 @@ steps:
 # Deploy container image to Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
-  args: ['run','deploy','generic-qaqc', '--image=gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA', '--cpu=4','--memory=16Gi', '--region=us-central1', '--service-account=qa-qc-prod@nih-nci-dceg-connect-prod-6d04.iam.gserviceaccount.com']
+  args: ['run','deploy','generic-qaqc', '--image=gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA', '--cpu=2','--memory=8192Mi', '--region=us-central1', '--service-account=qa-qc-prod@nih-nci-dceg-connect-prod-6d04.iam.gserviceaccount.com']
 
 options:
   logging: CLOUD_LOGGING_ONLY
