@@ -10,10 +10,10 @@ default:
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
+  flag: "export2box"
 recruitment:
   QC_REPORT: recruitment
   rules_file: qc_rules_recruitment.xlsx
-  flag: "export2box"
 module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
