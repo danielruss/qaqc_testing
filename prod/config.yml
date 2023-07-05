@@ -6,13 +6,15 @@ default:
   bucket: gs://qaqc_reports_prod
   box_app: NCI_BOX_GCP_CONNECT4CANCER_PROD
   box_folder: "211674408263"
-  flag: export2box
+  flag: ""
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
 recruitment:
   QC_REPORT: recruitment
   rules_file: qc_rules_recruitment.xlsx
+  flag: "export2box"
 module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
+  flag: "export2box"

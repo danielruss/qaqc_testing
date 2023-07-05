@@ -38,10 +38,14 @@ function() {
 }
 
 #* Runs QAQC for recruitment data set
+#* @param min_rule:int - row of rules file to start at
+#* @param max_rule:int - row of rules file to end at
 #* @get /qaqc-recruitment
 #* @post /qaqc-recruitment
-function() {
+function(min_rule=NULL, max_rule=NULL) {
   Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
+  Sys.setenv(MIN_RULE = min_rule)
+  Sys.setenv(MAX_RULE = max_rule)
   message("Starting recruitment QAQC...")
   source("qaqc.R", echo = TRUE)
   return("Recruitment QAQC complete!")
