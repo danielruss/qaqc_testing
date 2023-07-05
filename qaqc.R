@@ -13,11 +13,15 @@ library(config)
 library(writexl)
 source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
-write_to_gcs <- TRUE # write xlsx output locally by default
+write_to_gcs <- FALSE # write xlsx output locally by default
 flag <- ""
+rules_range <- NULL # read all of the rules by default, override with environment
+                    # variable if using Cloud Run and parallelizing the job
+# Specify the range of columns used in the rules file
+rules_col_min <- "A" 
+rules_col_max <- "N"
 
-#Authenticate to bigrquery
-bigrquery::bq_auth()
+
 
 ################################################################################
 ####################    Define Parameters Here     #############################
@@ -32,6 +36,8 @@ write_to_gcs  <- config::get("write_to_gcs")
 bucket        <- config::get("bucket")
 flag          <- config::get("flag")
 sheet         <- NULL
+rules_range   <- paste0(rules_col_min, Sys.getenv("MIN_RULE"), ":", rules_col_max, Sys.getenv("MAX_RULE"))
+project       <- config::get("project_id")
 
 # ## Biospecimen
 # QC_REPORT  <- "biospecimen"
@@ -40,12 +46,16 @@ sheet         <- NULL
 # tier       <- "prod"
 # write_to_gcs <- FALSE
 
-### Recruitment
-# QC_REPORT  <- "recruitment"
-# rules_file <- "qc_rules_recruitment.xlsx"
-# sheet      <- NULL
-# tier       <- "prod"
-# write_to_gcs <- FALSE
+## Recruitment
+# tier          <- "prod"
+# QC_REPORT     <- "recruitment"
+# rules_file    <- config::get(value="rules_file",   file=glue("{tier}/config.yml"), config=QC_REPORT)
+# write_to_gcs  <- FALSE
+# bucket        <- config::get(value="bucket",       file=glue("{tier}/config.yml"), config=QC_REPORT)
+# flag          <- config::get(value="flag",         file=glue("{tier}/config.yml"), config=QC_REPORT)
+# sheet         <- NULL
+# project       <- config::get(value="project_id",   file=glue("{tier}/config.yml"), config=QC_REPORT)
+# rules_range   <- "A2:N300"
 
 ## Module 1
 # QC_REPORT  <- "module1"
@@ -56,11 +66,17 @@ sheet         <- NULL
 ################################################################################
 ################################################################################
 
+#Authenticate to bigrquery
+bq_auth()
+
 # Name of output/report file
 # report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
 #                      "_",tier,"_",Sys.Date(),".xlsx")
+range_str  <- ifelse(!is.null(rules_range),
+                     glue("rules_range_{rules_range}"),
+                     "")
 report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(),".xlsx", sep="_")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), range_str, ".xlsx", sep="_")
 
 # Look-up table of project ids
 project    <- switch(tier,
@@ -795,15 +811,36 @@ data$index <- 1:nrow(data)
 }
 
 ## I need to load the rules file....
-rules <- read_excel(rules_file,sheet=sheet, col_types = 'text') %>%
-  mutate(ValidValues=map(ValidValues,convertToVector),
-         CrossVariableConceptID1Value=map(CrossVariableConceptID1Value,convertToVector),
-         CrossVariableConceptID2Value=map(CrossVariableConceptID2Value,convertToVector),
-         CrossVariableConceptID3Value=map(CrossVariableConceptID3Value,convertToVector),
-         CrossVariableConceptID4Value=map(CrossVariableConceptID4Value,convertToVector))
+# First get just the column names from the rules file
+column_names <- names(
+  read_excel(
+    rules_file,
+    sheet = sheet,
+    col_types = 'text',
+    range = glue("{rules_col_min}1:{rules_col_max}1"),
+    col_names = TRUE
+  )
+)
+
+rules <-
+  read_excel(
+    rules_file,
+    sheet = sheet,
+    col_types = 'text',
+    range = rules_range,
+    col_names = column_names
+  ) %>%
+  mutate(
+    ValidValues = map(ValidValues, convertToVector),
+    CrossVariableConceptID1Value = map(CrossVariableConceptID1Value, convertToVector),
+    CrossVariableConceptID2Value = map(CrossVariableConceptID2Value, convertToVector),
+    CrossVariableConceptID3Value = map(CrossVariableConceptID3Value, convertToVector),
+    CrossVariableConceptID4Value = map(CrossVariableConceptID4Value, convertToVector)
+  )
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
+Rprof()
 x <- runQC(data, rules, ids=Connect_ID)
 
 if (length(x)==0) {
@@ -863,3 +900,4 @@ if (length(x)==0) {
     print("Successfully uploaded to GCS Bucket.")
   }
 }
+Rprof(NULL)
