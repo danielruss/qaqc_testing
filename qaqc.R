@@ -35,6 +35,8 @@ tier          <- config::get("tier")
 write_to_gcs  <- config::get("write_to_gcs")
 bucket        <- config::get("bucket")
 flag          <- config::get("flag")
+rules_col_min <- config::get("rules_col_min")
+rules_col_max <- config::get("rules_col_max")
 sheet         <- NULL
 rules_range   <- paste0(rules_col_min, Sys.getenv("MIN_RULE"), ":", rules_col_max, Sys.getenv("MAX_RULE"))
 project       <- config::get("project_id")
