@@ -11,3 +11,8 @@ recruitment/cloud_run_stg/~$*
 *.DS_Store
 *qc_report*
 *.Rproj
+~$out.xlsx
+profile.R 
+out.xlsx
+.vscode*
+Rprof.out
