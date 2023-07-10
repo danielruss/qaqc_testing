@@ -19,7 +19,7 @@ rules_range <- NULL # read all of the rules by default, override with environmen
                     # variable if using Cloud Run and parallelizing the job
 # Specify the range of columns used in the rules file
 rules_col_min <- "A" 
-rules_col_max <- "N"
+rules_col_max <- "Z"
 
 
 
@@ -588,7 +588,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
 
       sql <- sprintf("SELECT token, Connect_ID, * FROM `%s.%s` %s", project, table, where_clause)
       tb  <- bq_project_query(project, query=sql)
-      data[[table]] <- bq_table_download(tb, bigint = c("character"))
+      data[[table]] <- bq_table_download(tb, bigint="integer64", page_size=5000)
 
     } else {
 
@@ -612,7 +612,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=2000)
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=5000)
       }
 
       # Join list of datasets into single dateset
@@ -795,7 +795,7 @@ if (loadFromBQ){
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
     where_clause        <- ""
-    download_in_chunks  <- TRUE
+    download_in_chunks  <- FALSE
     data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
   }
   else if (QC_REPORT == "module1") {
