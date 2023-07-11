@@ -31,6 +31,7 @@ bucket        <- config::get("bucket")
 flag          <- config::get("flag")
 min_rule <- Sys.getenv("MIN_RULE")
 max_rule <- Sys.getenv("MAX_RULE")
+
 sheet         <- NULL
 project       <- config::get("project_id")
 
