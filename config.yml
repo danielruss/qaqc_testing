@@ -1,18 +1,20 @@
 default:
   tier: stg
   project_id: "nih-nci-dceg-connect-stg-5519"
-  project_number: 810867956467
+  project_number: "810867956467"
   write_to_gcs: TRUE
-  box_folder: 211501237681
-  box_app: NCI_BOX_GCP_CONNECT4CANCER_DEV
   bucket: gs://qaqc_reports
-  flag: export2box
+  box_app: NCI_BOX_GCP_CONNECT4CANCER_DEV
+  box_folder: "211501237681"
+  flag: ""
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
+  flag: export2box
 recruitment:
   QC_REPORT: recruitment
   rules_file: qc_rules_recruitment.xlsx
 module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
+  flag: export2box

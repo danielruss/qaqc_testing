@@ -15,12 +15,6 @@ source("get_merged_module_1_data.R")
 source("get_merged_biospecimen_and_recruitment_data.R")
 write_to_gcs <- FALSE # write xlsx output locally by default
 flag <- ""
-rules_range <- NULL # read all of the rules by default, override with environment
-                    # variable if using Cloud Run and parallelizing the job
-# Specify the range of columns used in the rules file
-rules_col_min <- "A" 
-rules_col_max <- "Z"
-
 
 
 ################################################################################
@@ -35,10 +29,10 @@ tier          <- config::get("tier")
 write_to_gcs  <- config::get("write_to_gcs")
 bucket        <- config::get("bucket")
 flag          <- config::get("flag")
-rules_col_min <- config::get("rules_col_min")
-rules_col_max <- config::get("rules_col_max")
+min_rule <- Sys.getenv("MIN_RULE")
+max_rule <- Sys.getenv("MAX_RULE")
+
 sheet         <- NULL
-rules_range   <- paste0(rules_col_min, Sys.getenv("MIN_RULE"), ":", rules_col_max, Sys.getenv("MAX_RULE"))
 project       <- config::get("project_id")
 
 # ## Biospecimen
@@ -72,11 +66,7 @@ project       <- config::get("project_id")
 bq_auth()
 
 # Name of output/report file
-# report_fid <- paste0("qc_report_",QC_REPORT,"_", sheet,
-#                      "_",tier,"_",Sys.Date(),".xlsx")
-range_str  <- ifelse(!is.null(rules_range),
-                     glue("rules_range_{rules_range}"),
-                     "")
+range_str  <- glue("rules{min_rule}to{max_rule}")
 report_fid <-
   paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), range_str, ".xlsx", sep="_")
 
@@ -814,23 +804,11 @@ data$index <- 1:nrow(data)
 
 ## I need to load the rules file....
 # First get just the column names from the rules file
-column_names <- names(
-  read_excel(
-    rules_file,
-    sheet = sheet,
-    col_types = 'text',
-    range = glue("{rules_col_min}1:{rules_col_max}1"),
-    col_names = TRUE
-  )
-)
-
 rules <-
   read_excel(
     rules_file,
     sheet = sheet,
-    col_types = 'text',
-    range = rules_range,
-    col_names = column_names
+    col_types = 'text'
   ) %>%
   mutate(
     ValidValues = map(ValidValues, convertToVector),
@@ -839,6 +817,12 @@ rules <-
     CrossVariableConceptID3Value = map(CrossVariableConceptID3Value, convertToVector),
     CrossVariableConceptID4Value = map(CrossVariableConceptID4Value, convertToVector)
   )
+
+# Make sure the specified last rule is not greater than the number of rules available
+max_rule <- ifelse(max_rule >= length(rules), max_rule, length(rules))
+
+# Keep just the specified rules
+rules <- rules[min_rule:max_rule,] 
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
