@@ -8,35 +8,6 @@ function() {
   return("alive")
 }
 
-#* Run all qaqc reports
-#* @get /qaqc-all
-#* @post /qaqc-all
-function() {
-
-  echo = TRUE # Set this to TRUE when debugging
-  message("Running QAQC...")
-
-  # Set config for recruitment and run QAQC
-  message("Starting recruitment QAQC...")
-  Sys.setenv(R_CONFIG_ACTIVE = "recruitment")
-  source("qaqc.R", echo = echo)
-  message("Finished recruitment QAQC!")
-
-  # Set config for biospecimen and run QAQC
-  message("Starting biospecimen QAQC...")
-  Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
-  source("qaqc.R", echo = echo)
-  message("Finished biospecimen QAQC!")
-
-  # Set config for module 1 and run QAQC
-  message("Starting Module 1 QAQC...")
-  Sys.setenv(R_CONFIG_ACTIVE = "module1")
-  source("qaqc.R", echo = echo)
-  message("Finished Module 1 QAQC!")
-
-  return("All QAQC reports complete!")
-}
-
 #* Runs QAQC for recruitment data set
 #* @param min_rule:int - row of rules file to start at
 #* @param max_rule:int - row of rules file to end at
@@ -58,7 +29,7 @@ function() {
   message("Starting biospecimen QAQC...")
   Sys.setenv(R_CONFIG_ACTIVE = "biospecimen")
   Sys.setenv(MIN_RULE = 2)
-  Sys.setenv(MAX_RULE = 10000)
+  Sys.setenv(MAX_RULE = 1000) 
   source("qaqc.R", echo = TRUE)
   return("Biospecimen QAQC complete!")
 }
