@@ -18,3 +18,7 @@ module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
   flag: export2box
+module2:
+  QC_REPORT: module2
+  rules_file: qc_rules_module2.xlsx
+  flag: export2box
