@@ -27,21 +27,11 @@ if (local_drive == getwd()) {
 }
 
 ### USE this if you are running on GCP Cloud Run and/or using plumber
+project       <- config::get("project_id")
 QC_REPORT     <- config::get("QC_REPORT")
 rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
 bucket        <- config::get("bucket")
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-flag          <- config::get("flag")
-min_rule <- Sys.getenv("MIN_RULE")
-max_rule <- Sys.getenv("MAX_RULE")
-sheet         <- NULL
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-project       <- config::get("project_id")
 flag          <- config::get("flag")
 write_to_gcs  <- if_else(local_drive == getwd(), FALSE, TRUE)
 min_rule      <- Sys.getenv("MIN_RULE")
@@ -55,9 +45,9 @@ sheet         <- NULL
 bq_auth()
 
 # Name of output/report file
-range_str  <- glue("rules{min_rule}to{max_rule}")
+rules_str  <- glue("rules{min_rule}to{max_rule}")
 report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), range_str, ".xlsx", sep="_")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, ".xlsx", sep="_")
 
 # Look-up table of project ids
 project    <- switch(tier,

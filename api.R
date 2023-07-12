@@ -23,6 +23,8 @@ function(min_rule=1, max_rule=10000) {
 }
 
 #* Runs QAQC for biospecimen data set
+#* @param min_rule:int - row of rules file to start at
+#* @param max_rule:int - row of rules file to end at
 #* @get /qaqc-biospecimen
 #* @post /qaqc-biospecimen
 function(min_rule=1, max_rule=10000) {
@@ -35,6 +37,8 @@ function(min_rule=1, max_rule=10000) {
 }
 
 #* Runs QAQC for module 1 data set
+#* @param min_rule:int - row of rules file to start at
+#* @param max_rule:int - row of rules file to end at
 #* @get /qaqc-module1
 #* @post /qaqc-module1
 function(min_rule=1, max_rule=10000) {
