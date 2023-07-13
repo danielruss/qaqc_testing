@@ -19,7 +19,7 @@ library(writexl)
 # Use these settings if running locally
 local_drive = "/Users/petersjm/Documents/qaqc_testing" # set to your working dir
 if (local_drive == getwd()) {
-  Sys.setenv(R_CONFIG_ACTIVE = "recruitment") # "recruitment", "biospecimen", "module1", "module2"
+  Sys.setenv(R_CONFIG_ACTIVE = "module2") # "recruitment", "biospecimen", "module1", "module2"
   tier = "prod" # "prod", "stg"
   Sys.setenv(R_CONFIG_file = glue("{tier}/config.yml"))
   Sys.setenv(MIN_RULE = 1)     # rule to start at
@@ -48,12 +48,6 @@ bq_auth()
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 report_fid <-
   paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, ".xlsx", sep="_")
-
-# Look-up table of project ids
-project    <- switch(tier,
-                     dev  = "nih-nci-dceg-connect-dev",
-                     stg  = "nih-nci-dceg-connect-stg-5519",
-                     prod = "nih-nci-dceg-connect-prod-6d04")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
