@@ -1,3 +1,12 @@
+################################################################################
+#############    Define Parameters Here IF Running Locally    ##################
+################################################################################
+local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
+tier        <- "prod" # "prod" or "stg"
+module      <- "module2" # "recruitment", "biospecimen", "module1" or "module2"
+################################################################################
+################################################################################
+
 library(tidyverse)
 library(bigrquery)
 library(tidyverse)
@@ -12,21 +21,15 @@ library(janitor)
 library(config)
 library(writexl)
 
-################################################################################
-####################    Define Parameters Here     #############################
-################################################################################
-
-# Use these settings if running locally
-local_drive = "/Users/petersjm/Documents/qaqc_testing" # set to your working dir
+# Configure system variables for local run
 if (local_drive == getwd()) {
-  Sys.setenv(R_CONFIG_ACTIVE = "recruitment") # "recruitment", "biospecimen", "module1", "module2"
-  tier = "prod" # "prod", "stg"
-  Sys.setenv(R_CONFIG_file = glue("{tier}/config.yml"))
+  Sys.setenv(R_CONFIG_ACTIVE = module) # configuration to use
+  Sys.setenv(R_CONFIG_FILE = glue("{tier}/config.yml")) # config path
   Sys.setenv(MIN_RULE = 1)     # rule to start at
   Sys.setenv(MAX_RULE = 10000) # rule to end at (pick large value to run all)
 }
 
-### USE this if you are running on GCP Cloud Run and/or using plumber
+# Get parameters from configuration file
 project       <- config::get("project_id")
 QC_REPORT     <- config::get("QC_REPORT")
 rules_file    <- config::get("rules_file")
@@ -38,9 +41,6 @@ min_rule      <- Sys.getenv("MIN_RULE")
 max_rule      <- Sys.getenv("MAX_RULE")
 sheet         <- NULL
 
-################################################################################
-################################################################################
-
 #Authenticate to bigrquery
 bq_auth()
 
@@ -48,12 +48,6 @@ bq_auth()
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 report_fid <-
   paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, ".xlsx", sep="_")
-
-# Look-up table of project ids
-project    <- switch(tier,
-                     dev  = "nih-nci-dceg-connect-dev",
-                     stg  = "nih-nci-dceg-connect-stg-5519",
-                     prod = "nih-nci-dceg-connect-prod-6d04")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()

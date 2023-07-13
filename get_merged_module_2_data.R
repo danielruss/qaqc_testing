@@ -1,6 +1,9 @@
 source("get_merged_module_1_data.R")
 
 get_merged_module_2_data <- function(project) {
+# This function merges Module 2 V1/V2 data with Module 1 V1/V2 Data. 
+# Kelsey and Jing wrote most of the code and Jake Peters modified it to run 
+# reliably as a function within the QAQC pipeline. 
   
   ## Load data.table package
   require(data.table)
@@ -75,8 +78,8 @@ get_merged_module_2_data <- function(project) {
   var.matched <- M2_V1.var[which(M2_V1.var %in% M2_V2.var)]
   length(var.matched)  #1275 #1278 vars 01112023 #1348 vars 05022023
   
-  V1_only_vars <- colnames(M2_V1)[colnames(M2_V1) %nin% var.matched] #232 #229 01112023 #159 05022023
-  V2_only_vars <- colnames(M2_V2)[colnames(M2_V2) %nin% var.matched] #253 #253 01112023 #545 05022023
+  V1_only_vars <- colnames(M2_V1)[colnames(M2_V1) %!in% var.matched] #232 #229 01112023 #159 05022023
+  V2_only_vars <- colnames(M2_V2)[colnames(M2_V2) %!in% var.matched] #253 #253 01112023 #545 05022023
   
   length(M2_V1$Connect_ID[M2_V1$Connect_ID %in% M2_V2$Connect_ID])
   #[1] 59 with the completion of two versions of module2
@@ -109,8 +112,8 @@ get_merged_module_2_data <- function(project) {
   #library(janitor)
   
   M2_common <- rbind(M2_V1_common,M2_V2_common)
-  M2_common_v1 <- merge(M2_common, M2_v1_only, by=c("Connect_ID","version"),all.x=TRUE)
-  M2_combined_v1v2 <- merge(M2_common_v1,M2_v2_only,by=c("Connect_ID","version"),all.x=TRUE)
+  M2_common_v1 <- base::merge(M2_common, M2_v1_only, by=c("Connect_ID","version"),all.x=TRUE)
+  M2_combined_v1v2 <- base::merge(M2_common_v1,M2_v2_only,by=c("Connect_ID","version"),all.x=TRUE)
   M2_complete <- M2_combined_v1v2[which(M2_combined_v1v2$Connect_ID %in% recr_m2$Connect_ID[which(recr_m2$d_536735468 ==231311385 )]),] #7289 including duplicates 05022023
   
   M2_complete <- M2_complete %>% arrange(desc(version))
@@ -122,25 +125,22 @@ get_merged_module_2_data <- function(project) {
   
   M2_complete_nodup$Connect_ID <- as.numeric(M2_complete_nodup$Connect_ID)
   
-  
-  merge_m2 <- left_join(merged, M2_complete_nodup, by="Connect_ID") #%>%  left_join(m3_data, by="Connect_ID")
-  
   ##### Get Module 1 Data #####
   # Note, this returns M1V1, M1V2 and some Recruitment data
   merge_m1 <- get_merged_module_1_data(project)
   
   ##### Merge Module 1 and Module 2 Data #####
-  data <- left_join(merge_m2, merge_m1, by="Connect_ID")
+  data <- left_join(M2_complete_nodup, merge_m1, by="Connect_ID")
   data
 }
 
 
-bq_auth(
-  email = "jake.peters@nih.gov",
-  scopes = c("https://www.googleapis.com/auth/bigquery",
-             "https://www.googleapis.com/auth/cloud-platform"),
-  cache = gargle::gargle_oauth_cache(),
-  use_oob = gargle::gargle_oob_default(),
-  token = token_fetch())
-
-data <- get_merged_module_2_data("nih-nci-dceg-connect-prod-6d04")
+# bq_auth(
+#   email = "jake.peters@nih.gov",
+#   scopes = c("https://www.googleapis.com/auth/bigquery",
+#              "https://www.googleapis.com/auth/cloud-platform"),
+#   cache = gargle::gargle_oauth_cache(),
+#   use_oob = gargle::gargle_oob_default(),
+#   token = token_fetch())
+# 
+# data <- get_merged_module_2_data("nih-nci-dceg-connect-prod-6d04")
