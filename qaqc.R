@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "module2" # "recruitment", "biospecimen", "module1" or "module2"
+module      <- "recruitment" # "recruitment", "biospecimen", "module1" or "module2"
 ################################################################################
 ################################################################################
 
@@ -799,7 +799,7 @@ rules <-
   )
 
 # Make sure the specified last rule is not greater than the number of rules available
-max_rule <- ifelse(max_rule >= length(rules), max_rule, length(rules))
+max_rule <- ifelse(max_rule >= nrow(rules), max_rule, nrow(rules))
 
 # Keep just the specified rules
 rules <- rules[min_rule:max_rule,] 
