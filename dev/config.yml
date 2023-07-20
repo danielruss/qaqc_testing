@@ -1,0 +1,24 @@
+default:
+  tier: dev
+  project_id: "nih-nci-dceg-connect-dev"
+  project_number: "1061430463455"
+  write_to_gcs: FALSE
+  bucket: ""
+  box_app: ""
+  box_folder: ""
+  flag: ""
+biospecimen:
+  QC_REPORT: biospecimen
+  rules_file: qc_rules_biospecimen.xlsx
+  flag: export2box
+recruitment:
+  QC_REPORT: recruitment
+  rules_file: qc_rules_recruitment.xlsx
+module1:
+  QC_REPORT: module1
+  rules_file: qc_rules_module1.xlsx
+  flag: export2box
+module2:
+  QC_REPORT: module2
+  rules_file: qc_rules_module2.xlsx
+  flag: export2box
