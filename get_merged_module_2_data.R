@@ -37,7 +37,7 @@ get_merged_module_2_data <- function(project) {
   q <- glue("SELECT token,Connect_ID, d_821247024, d_914594314, ",
              "d_827220437, d_512820379, d_536735468 , d_517311251  ",
              "FROM  `{project}.FlatConnect.participants_JP` ",
-             "WHERE  d_821247024='197316935'")
+             "WHERE  d_821247024='197316935' AND d_831041022='104430631'")
   recr_m2 <- bq_project_query(project, query=q)
   recr_m2 <- bq_table_download(recr_m2,bigint = "integer64")
   cnames <- names(recr_m2)

@@ -4,7 +4,7 @@ get_merged_biospecimen_and_recruitment_data <-
   
   sql1 <- "WITH
             PART AS (SELECT * FROM `{project}.FlatConnect.participants_JP`
-                     WHERE CONNECT_ID IS NOT NULL),
+                     WHERE CONNECT_ID IS NOT NULL AND d_831041022='104430631'),
             BIO AS (SELECT * FROM `{project}.FlatConnect.biospecimen_JP`)
            SELECT * FROM BIO LEFT JOIN PART ON PART.Connect_ID = BIO.Connect_ID"
   

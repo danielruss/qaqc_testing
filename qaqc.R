@@ -31,6 +31,7 @@ if (local_drive == getwd()) {
 
 # Get parameters from configuration file
 project       <- config::get("project_id")
+billing       <- project
 QC_REPORT     <- config::get("QC_REPORT")
 rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
@@ -551,8 +552,8 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
     
     if (!download_in_chunks) {
       
-      q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
-                   select, project, table, where_clause)
+      q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s",
+                   project, table, where_clause)
       tb  <- bq_project_query(project, query=q)
       data[[table]] <- bq_table_download(tb, bigint="integer64", page_size=5000)
       
@@ -566,7 +567,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
       # print(vars_$column_name)
       
       # Define range of data to download per chunk
-      nvar   <- floor((length(vars_d$column_name))/8) # num vars to per query
+      nvar   <- floor((length(vars_d$column_name))/12) # num vars to per query
       start  <- seq(1,length(vars_d$column_name),nvar)
       end    <- length(vars_d$column_name)
       
@@ -578,7 +579,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=5000)
+        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=1000)
       }
       
       # Join list of datasets into single dateset
@@ -761,12 +762,13 @@ if (loadFromBQ){
   }
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
-    where_clause        <- ""
-    download_in_chunks  <- TRUE
+    where_clause        <- "WHERE d_831041022='104430631'"
+    download_in_chunks  <- FALSE
     data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
   }
   else if (QC_REPORT == "module1") {
     source("get_merged_module_1_data.R")
+    where_clause
     data <- get_merged_module_1_data(project)
   }
   else if (QC_REPORT == "module2") {
