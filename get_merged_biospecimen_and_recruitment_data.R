@@ -4,8 +4,8 @@ get_merged_biospecimen_and_recruitment_data <-
   
   sql1 <- "WITH
             PART AS (SELECT * FROM `{project}.FlatConnect.participants_JP`
-                     WHERE CONNECT_ID IS NOT NULL AND d_831041022='104430631'),
-            BIO AS (SELECT * FROM `{project}.FlatConnect.biospecimen_JP`)
+                     WHERE Connect_ID IS NOT NULL AND d_831041022='104430631'),
+            BIO AS (SELECT * FROM `{project}.FlatConnect.biospecimen_JP` WHERE Connect_ID IS NOT NULL)
            SELECT * FROM BIO LEFT JOIN PART ON PART.Connect_ID = BIO.Connect_ID"
   
   data_query <- bq_project_query(project, query = glue(sql1))
@@ -16,7 +16,7 @@ get_merged_biospecimen_and_recruitment_data <-
   if (exclude_duplicates==TRUE) {
     
     # This query gets a list of Connect_IDs with multiple entries
-    sql2 <- "SELECT Connect_ID FROM `{project}.FlatConnect.biospecimen_JP`
+    sql2 <- "SELECT Connect_ID FROM `{project}.FlatConnect.biospecimen_JP` WHERE Connect_ID IS NOT NULL
              GROUP BY Connect_ID HAVING COUNT(Connect_ID) > 1"
     
     # This gets a list of Connect_IDs with multiple entries

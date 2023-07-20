@@ -19,7 +19,7 @@ get_merged_module_1_data <- function(project) {
                      "d_827220437, d_512820379, d_949302066 , d_517311251,",
                      "d_205553981 ",
                      "FROM  `{project}.FlatConnect.participants_JP` ",
-                     "WHERE  d_821247024='197316935' AND d_831041022='104430631'")
+                     "WHERE  Connect_ID IS NOT NULL AND d_821247024='197316935' AND d_831041022='104430631'")
   query_recr_m1 <- bq_project_query(project, query=sql_rec_m1)
   recr_m1 <- bq_table_download(query_recr_m1,bigint = "integer64")
   cnames <- names(recr_m1)

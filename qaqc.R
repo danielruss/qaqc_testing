@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
 tier        <- "stg" # "prod" or "stg"
-module      <- "module2" # "recruitment", "biospecimen", "module1" or "module2"
+module      <- "module1" # "recruitment", "biospecimen", "module1" or "module2"
 ################################################################################
 ################################################################################
 
