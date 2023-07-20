@@ -2,8 +2,8 @@
 #############    Define Parameters Here IF Running Locally    ##################
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
-tier        <- "prod" # "prod" or "stg"
-module      <- "recruitment" # "recruitment", "biospecimen", "module1" or "module2"
+tier        <- "stg" # "prod" or "stg"
+module      <- "module2" # "recruitment", "biospecimen", "module1" or "module2"
 ################################################################################
 ################################################################################
 
@@ -768,7 +768,6 @@ if (loadFromBQ){
   }
   else if (QC_REPORT == "module1") {
     source("get_merged_module_1_data.R")
-    where_clause
     data <- get_merged_module_1_data(project)
   }
   else if (QC_REPORT == "module2") {
