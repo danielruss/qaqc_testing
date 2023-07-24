@@ -555,7 +555,7 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
       q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s",
                    project, table, where_clause)
       tb  <- bq_project_query(project, query=q)
-      data[[table]] <- bq_table_download(tb, bigint="integer64", page_size=5000)
+      data[[table]] <- bq_table_download(tb, bigint="integer64", page_size=1000)
       
     } else {
       
