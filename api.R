@@ -42,7 +42,6 @@ function(dataset,
   Sys.setenv(MAX_RULE = as.integer(max_rule))
   Sys.setenv(START_INDEX = as.integer(start_index))
   Sys.setenv(N_MAX = as.double(n_max))
-  Sys.setenv(USING_PLUMBER_API = TRUE)
   
   # Inform the user that the QAQC process is starting
   message(glue("Starting {dataset} QAQC..."))
