@@ -2,8 +2,9 @@
 #############    Define Parameters Here IF Running Locally    ##################
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
-tier        <- "stg" # "prod" or "stg"
-module      <- "module1" # "recruitment", "biospecimen", "module1" or "module2"
+tier        <- "prod" # "prod" or "stg"
+module      <- "recruitment" # "recruitment", "biospecimen", "module1" or "module2"
+testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -22,11 +23,13 @@ library(config)
 library(writexl)
 
 # Configure system variables for local run
-if (local_drive == getwd()) {
+if (local_drive == getwd() & testing_api == FALSE) {
   Sys.setenv(R_CONFIG_ACTIVE = module) # configuration to use
   Sys.setenv(R_CONFIG_FILE = glue("{tier}/config.yml")) # config path
   Sys.setenv(MIN_RULE = 1)     # rule to start at
   Sys.setenv(MAX_RULE = 10000) # rule to end at (pick large value to run all)
+  Sys.setenv(START_INDEX = 0)
+  Sys.setenv(N_MAX = Inf)
 }
 
 # Get parameters from configuration file
@@ -40,6 +43,8 @@ flag          <- config::get("flag")
 write_to_gcs  <- if_else(local_drive == getwd(), FALSE, TRUE)
 min_rule      <- Sys.getenv("MIN_RULE")
 max_rule      <- Sys.getenv("MAX_RULE")
+start_index   <- as.numeric(Sys.getenv("START_INDEX"))
+n_max         <- as.numeric(Sys.getenv("N_MAX"))
 sheet         <- NULL
 
 #Authenticate to bigrquery
@@ -58,7 +63,13 @@ dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>
 
 ######################### User-defined Functions ###############################
 
+
 dictionary_lookup <- function(x){
+  # This function performs a dictionary lookup on a list of values stored in a 
+  # global variable named "dl". The dictionary keys are expected to have the 
+  # format "d_CID", where CID is a unique identifier for each value. For each 
+  # input value, the function retrieves the corresponding value from the dictionary.
+  # If a value is not found in the dictionary, "NA" is used in the output list.
   x=as.list(x)
   skel <- as.relistable(x)
   x <- unlist(x)
@@ -96,10 +107,9 @@ crossValidate <- function(value1,valid_values1,value2,valid_values2,value3,valid
   (value1 %in% valid_values1) & (value2 %in% valid_values2) & (value3 %in% valid_values3) & (value4 %in% valid_values4)
 }
 
-## getCIDValues takes a string of a column name (a concept id), and looks up the
-## the value in the data tibble.  The issue we need to be careful
-## with are the NA's. Dont try to evaluate NAs..
-# Note: data is a column of data for a CID from BQ
+# Takes a concept ID (CID) as a string and looks up its corresponding value in 
+# the provided data tibble. If the CID is NA, it returns NA_character_ to 
+# represent missing data.
 getCIDValue <- function(cid,data){
   stopifnot(length(cid)==1)
   if (is.na(cid)) {
@@ -109,6 +119,10 @@ getCIDValue <- function(cid,data){
 }
 
 ## Functions for initializing the report dataframe
+
+# Initializes a list for report generation by ensuring all required variables 
+# have defined values. If a variable is missing, it sets it to an empty string 
+# or a default value. Used for creating a report dataframe.
 prepare_list_for_report<-function(arg_list){
   # JP NOTE: Guarantee that everything is defined, even if with an empty str
   arg_list$CrossVariableConceptID1 <- arg_list$CrossVariableConceptID1 %||% ""
@@ -129,6 +143,9 @@ prepare_list_for_report<-function(arg_list){
   
   arg_list
 }
+
+# Generates a report dataframe by extracting specific columns from the input 
+# data tibble and applying the necessary transformations based on provided rules.
 prepare_report <- function(data,l,ids){
   data %>%
     mutate(site_id=data$d_827220437,
@@ -203,7 +220,8 @@ prepare_report <- function(data,l,ids){
            {{ids}})
 }
 
-## Adverb functions to be used to modify validation functions
+# Adverb functions to be used to modify validation functions.
+# Validates data based on cross-variable checks and filters report rows accordingly.
 crossvalidly <- function(f){
   function(data,ids,...){
     l = list(...)
@@ -248,6 +266,9 @@ crossvalidly <- function(f){
     
   }
 }
+
+#Adverb function used to modify validation functions. Runs validation rules, 
+#allowing NA values for the invalid_values column in the report.
 na_ok <- function(f){
   function(data,ids,...){
     f(data,ids={{ids}},na_ok=TRUE,...) %>%
@@ -255,7 +276,8 @@ na_ok <- function(f){
   }
 }
 
-## Validation Rules
+# Applies validation rules to check data validity based on provided concept ID 
+# and valid values. Filters report rows based on validation results.
 valid <- function(data,ids,...){
   #message("... Running valid")
   # ok, this is a difficult concept, but the conceptId is passed in as string.
@@ -286,8 +308,14 @@ valid <- function(data,ids,...){
   
   prepare_report(failed,l,{{ids}})
 }
+
+# Applies cross-variable validation to report rows and filters based on validation results.
 crossvalid <- crossvalidly(valid)
+
+# Applies validation rules to check data validity, allowing NA values in the invalid_values column in the report.
 na_or_valid <- na_ok(valid)
+
+# Applies cross-variable validation, allowing NA values for the invalid_values column in the report.
 na_or_crossvalid <- na_ok(crossvalid)
 
 ## The value of rules$Concept_ID must match that of rules$ValidValues [which is another CID]
@@ -555,7 +583,11 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
       q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s",
                    project, table, where_clause)
       tb  <- bq_project_query(project, query=q)
-      data[[table]] <- bq_table_download(tb, bigint="integer64", page_size=1000)
+      data[[table]] <- bq_table_download(tb, 
+                                         bigint="integer64", 
+                                         page_size=1000, 
+                                         start_index=start_index,
+                                         n_max=n_max)
       
     } else {
       
@@ -579,7 +611,11 @@ loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
         q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
                      select, project, table, where_clause)
         tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, bigint="integer64", page_size=1000)
+        bq_data[[i]] <- bq_table_download(tmp, 
+                                          bigint="integer64", 
+                                          page_size=1000,
+                                          start_index=start_index,
+                                          n_max=n_max)
       }
       
       # Join list of datasets into single dateset
