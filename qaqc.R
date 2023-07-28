@@ -52,8 +52,9 @@ bq_auth()
 
 # Name of output/report file
 rules_str  <- glue("rules{min_rule}to{max_rule}")
+rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
 report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, ".xlsx", sep="_")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str ".xlsx", sep="_")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
