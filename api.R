@@ -1,6 +1,11 @@
 #' Plumber API for Quality Assurance and Control
-#'
+#' 
+#' Author: Jake Peters
+#' Date: Fall 2022
+#' Last Updated: Aug. 2023
+#' 
 #' This Plumber API provides endpoints for running QAQC on different datasets.
+
 library(plumber)
 library(sys)
 library(glue)
