@@ -702,7 +702,7 @@ knitr::kable(polyblood) %>% kable_styling(latex_options = "scale_down")
 ### BioClin_DBUrineID_v1r0 must be in BioClin_PolyUrineID_v1r0
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
-bioqc1 <- bioqc1 %>%  filter(d_173836415_d_266600170_d_110349197!="[]" & !is.na(d_928693120)) %>%  mutate(BioClin_DBUrineID_v1r0=paste0("L", d_928693120))
+bioqc1 <- bioqc1 %>%  filter(d_173836415_d_266600170_d_110349197!="[]" & !is.na(d_928693120_integer)) %>%  mutate(BioClin_DBUrineID_v1r0=paste0("L", d_928693120_integer))
 
 bioqc1$BioClin_PolyUrineID_v1r0 <- str_sub(bioqc1$d_173836415_d_266600170_d_110349197, 2, -2)
 
@@ -905,14 +905,14 @@ bioqc <- bioqc %>%  mutate(Site=case_when(d_827220437==531629870 ~ "HealthPartne
 #qc1 <- bioqc %>%  filter(d_827220437==300267574)
 
 #Blood
-qc1_blood <- bioqc %>%  filter(str_sub(d_173836415_d_266600170_d_341570479,1,11)!=str_sub(d_646899796,1,11)) 
+qc1_blood <- bioqc %>%  filter(str_sub(d_173836415_d_266600170_d_341570479,1,11)!=str_sub(d_646899796_integer,1,11)) 
 
-qc1_blood <- qc1_blood %>% select(Site, Connect_ID, d_173836415_d_266600170_d_341570479, d_646899796, d_556788178 ) %>%  sort_by(Site)
+qc1_blood <- qc1_blood %>% select(Site, Connect_ID, d_173836415_d_266600170_d_341570479, d_646899796_integer, d_556788178 ) %>%  sort_by(Site)
 
 
 # qc1_blood %>%  gt() %>%  
 #   tab_header(title = md("KPHI Blood Accession ID Errors")) %>% 
-#   cols_label(Connect_ID = md("**Connect ID**"), d_173836415_d_266600170_d_341570479 = md("**KPHI Accession ID**"), d_646899796= md("**Expected Accession ID**"))
+#   cols_label(Connect_ID = md("**Connect ID**"), d_173836415_d_266600170_d_341570479 = md("**KPHI Accession ID**"), d_646899796_integer= md("**Expected Accession ID**"))
 
 colnames(qc1_blood) <- c("Site", "Connect ID", "KP Accession ID" , "Expected Accession ID", "Collection Date/Time")
 #knitr::kable(qc1_blood)
