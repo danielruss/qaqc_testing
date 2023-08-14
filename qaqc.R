@@ -23,7 +23,7 @@ library(glue)
 library(janitor)
 library(config)
 library(writexl)
-library(pryr)
+library(plyr)
 mem_used()
 
 # Configure system variables for local run
