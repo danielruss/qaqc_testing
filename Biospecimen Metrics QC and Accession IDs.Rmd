@@ -917,7 +917,7 @@ qc1_blood <- qc1_blood %>% select(Site, Connect_ID, d_173836415_d_266600170_d_34
 colnames(qc1_blood) <- c("Site", "Connect ID", "KP Accession ID" , "Expected Accession ID", "Collection Date/Time")
 #knitr::kable(qc1_blood)
 
-write.csv(qc1_blood,paste("~/Biospecimen/data/Mismatched_Blood_Accession_IDs",currentDate,".csv",sep="_"),row.names = F,na="")
+write.csv(qc1_blood,paste(local_drive, "Mismatched_Blood_Accession_IDs",currentDate,".csv",sep="_"),row.names = F,na="")
 
 ```
 
@@ -946,7 +946,7 @@ qc1_urine <- qc1_urine %>% select(Site, Connect_ID, d_173836415_d_266600170_d_19
 colnames(qc1_urine) <- c("Site", "Connect ID", "KP Accession ID" , "Expected Accession ID", "Collection Date/Time")
 #knitr::kable(qc1_urine)
 
-write.csv(qc1_urine,paste("~/Biospecimen/data/Mismatched_Urine_Accession_IDs",currentDate,".csv",sep="_"),row.names = F,na="")
+write.csv(qc1_urine,paste(local_drive, "Mismatched_Urine_Accession_IDs",currentDate,".csv",sep="_"),row.names = F,na="")
 
 
 ```
@@ -997,7 +997,7 @@ dup_list <- bio_dup %>%  select(Site, Connect_ID, d_820476880, d_556788178, Fina
 colnames(dup_list) <- c("Site", "Connect ID", "Collection ID", "Collection Date/Time", "Collection Finalized")
 #knitr::kable(dup_list)
 
-write.csv(dup_list,paste("~/Biospecimen/data/Duplicate_Baseline_Biospecimen_Collections",currentDate,".csv",sep="_"),row.names = F,na="")
+write.csv(dup_list,paste(local_drive, "Duplicate_Baseline_Biospecimen_Collections",currentDate,".csv",sep="_"),row.names = F,na="")
 
 ```
 
