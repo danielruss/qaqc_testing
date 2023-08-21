@@ -102,7 +102,7 @@ write_to_local_drive = T #F
 
 
 ### This function below determines whether the file will be created locally or not.
-local_drive= ifelse(write_to_local_drive, "~/Biospecimen/data/", "")
+local_drive= ifelse(write_to_local_drive, "C:/Users/dowlingk2/Documents/Module-Missingness-and-Metrics/data/", "")
 
 
 
