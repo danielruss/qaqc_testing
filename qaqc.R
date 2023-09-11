@@ -8,8 +8,8 @@ testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
-# Arbitrary comment ##
-
+# Load Dependecies
+library(plyr)
 library(tidyverse)
 library(bigrquery)
 library(tidyverse)
@@ -23,7 +23,7 @@ library(glue)
 library(janitor)
 library(config)
 library(writexl)
-#library(dplyr)
+
 
 
 # Configure system variables for local run
