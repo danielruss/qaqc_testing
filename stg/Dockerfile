@@ -1,5 +1,5 @@
 FROM rocker/tidyverse:latest
-RUN install2.r rio plumber bigrquery googleCloudStorageR gargle janitor rlang config writexl
+RUN install2.r plyr rio plumber bigrquery googleCloudStorageR gargle janitor rlang config writexl
 COPY ["./qaqc.R", "./qaqc.R"]
 COPY ["./api.R",  "./api.R"]
 COPY ["./stg/config.yml", "./config.yml"] # copy config.yml from local stg directory to main directory in cloud run
