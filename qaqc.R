@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "recruitment" # "recruitment", "biospecimen", "module1" or "module2"
+module      <- "module2" # "recruitment", "biospecimen", "module1" or "module2"
 testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
