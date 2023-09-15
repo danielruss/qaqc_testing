@@ -23,8 +23,8 @@ library(glue)
 library(janitor)
 library(config)
 library(writexl)
-library(plyr)
-mem_used()
+# library(plyr)
+
 
 # Configure system variables for local run
 if (local_drive == getwd() & testing_api == FALSE) {
@@ -839,18 +839,18 @@ rules <-
     CrossVariableConceptID3Value = map(CrossVariableConceptID3Value, convertToVector),
     CrossVariableConceptID4Value = map(CrossVariableConceptID4Value, convertToVector)
   )
-mem_used()
+
 # Make sure the specified last rule is not greater than the number of rules available
 max_rule <- ifelse(max_rule >= nrow(rules), max_rule, nrow(rules))
-mem_used()
+
 # Keep just the specified rules
 rules <- rules[min_rule:max_rule,] 
-mem_used()
+
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
 Rprof()
 x <- runQC(data, rules, ids=Connect_ID)
-mem_used()
+
 if (length(x)==0) {
   print("No qc issues found. No report generated.")
 } else {
@@ -880,7 +880,7 @@ if (length(x)==0) {
     CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
   ) %>%
     get_explanation()
-  mem_used()
+  
   
   # Alter column order
   col_order <- c("Connect_ID", "token",
@@ -897,7 +897,7 @@ if (length(x)==0) {
   # Write report and rules to separate sheets of excel file
   writexl::write_xlsx(list(report=x, rules=rules), report_fid)
   print(glue("{report_fid} save to local drive."))
-  mem_used()
+  
   
   # Upload report to cloud storage if desired
   if (write_to_gcs) {
@@ -911,4 +911,4 @@ if (length(x)==0) {
   }
 }
 Rprof(NULL)
-mem_used()
+

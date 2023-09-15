@@ -11,6 +11,7 @@ biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
   flag: "export2box"
+  box_folder: "221297686961"
 recruitment:
   QC_REPORT: recruitment
   rules_file: qc_rules_recruitment.xlsx
