@@ -45,6 +45,7 @@ rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
 bucket        <- config::get("bucket")
 flag          <- config::get("flag")
+boxfolder     <- config::get("box_folder")
 write_to_gcs  <- if_else(local_drive == getwd(), FALSE, TRUE)
 min_rule      <- Sys.getenv("MIN_RULE")
 max_rule      <- Sys.getenv("MAX_RULE")
@@ -59,7 +60,7 @@ bq_auth()
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
 report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, ".xlsx", sep="_")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
@@ -815,6 +816,18 @@ if (loadFromBQ){
   else if (QC_REPORT == "module2") {
     source("get_merged_module_2_data.R")
     data <- get_merged_module_2_data(project)
+  }
+  else if (QC_REPORT == "module3") {
+    tables              <- c('module3_v1_JP')
+    where_clause        <- ""
+    download_in_chunks  <- FALSE
+    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+  }
+  else if (QC_REPORT == "module4") {
+    tables              <- c('module4_v1_JP')
+    where_clause        <- ""
+    download_in_chunks  <- FALSE
+    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
   }
   # Add a row of indices so that we can refer back to the original position later
   # after filtering
