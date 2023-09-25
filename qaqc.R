@@ -8,8 +8,8 @@ testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
-# Arbitrary comment ##
-
+# Load Dependecies
+library(plyr)
 library(tidyverse)
 library(bigrquery)
 library(tidyverse)
@@ -24,6 +24,7 @@ library(janitor)
 library(config)
 library(writexl)
 # library(plyr)
+
 
 
 # Configure system variables for local run
@@ -44,6 +45,7 @@ rules_file    <- config::get("rules_file")
 tier          <- config::get("tier")
 bucket        <- config::get("bucket")
 flag          <- config::get("flag")
+boxfolder     <- config::get("box_folder")
 write_to_gcs  <- if_else(local_drive == getwd(), FALSE, TRUE)
 min_rule      <- Sys.getenv("MIN_RULE")
 max_rule      <- Sys.getenv("MAX_RULE")
@@ -58,7 +60,7 @@ bq_auth()
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
 report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, ".xlsx", sep="_")
+  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
@@ -815,6 +817,18 @@ if (loadFromBQ){
     source("get_merged_module_2_data.R")
     data <- get_merged_module_2_data(project)
   }
+  else if (QC_REPORT == "module3") {
+    tables              <- c('module3_v1_JP')
+    where_clause        <- ""
+    download_in_chunks  <- FALSE
+    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+  }
+  else if (QC_REPORT == "module4") {
+    tables              <- c('module4_v1_JP')
+    where_clause        <- ""
+    download_in_chunks  <- FALSE
+    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+  }
   # Add a row of indices so that we can refer back to the original position later
   # after filtering
   data$index <- 1:nrow(data)
@@ -880,7 +894,7 @@ if (length(x)==0) {
     CrossVariableConceptValidValue4_lookup= map_chr(CrossVariableConceptValidValue4_lookup,paste,collapse = ", "),
   ) %>%
     get_explanation()
-  
+
   
   # Alter column order
   col_order <- c("Connect_ID", "token",
@@ -897,7 +911,7 @@ if (length(x)==0) {
   # Write report and rules to separate sheets of excel file
   writexl::write_xlsx(list(report=x, rules=rules), report_fid)
   print(glue("{report_fid} save to local drive."))
-  
+
   
   # Upload report to cloud storage if desired
   if (write_to_gcs) {
