@@ -67,8 +67,8 @@ get_merged_module_1_data <- function(project) {
                       ### Begin Merging Steps
                       M1_V1.var <- colnames(M1_V1)
                       M1_V2.var <- colnames(M1_V2)
-                      print('M1_V1 columns: ', M1_V1.var)
-                      print('M1_V1 columns: ', M1_V1.var)
+#                      print('M1_V1 columns: ', M1_V1.var)
+#                      print('M1_V1 columns: ', M1_V1.var)
                       
                       var.matched <- M1_V1.var[which(M1_V1.var %in% M1_V2.var)]
                       length(var.matched)  
