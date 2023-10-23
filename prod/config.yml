@@ -3,7 +3,7 @@ default:
   project_id: "nih-nci-dceg-connect-prod-6d04"
   project_number: "155089172944"
   write_to_gcs: TRUE
-  bucket: gs://qaqc_reports_prod
+  bucket: gs://ccc_weekly_metrics_report
   box_app: NCI_BOX_GCP_CONNECT4CANCER_PROD
   box_folder: "211674408263"
   flag: ""
@@ -22,4 +22,12 @@ module1:
 module2:
   QC_REPORT: module2
   rules_file: qc_rules_module2.xlsx
+  flag: "export2box"
+module3:
+  QC_REPORT: module3
+  rules_file: qc_rules_module3.xlsx
+  flag: "export2box"
+module4:
+  QC_REPORT: module4
+  rules_file: qc_rules_module4.xlsx
   flag: "export2box"

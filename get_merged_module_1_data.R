@@ -1,7 +1,9 @@
-get_merged_module_1_data <- function(project) {
+get_merged_module_1_data <- function(project, specified_m1_vars = c("Connect_ID", "*")) {
   # Merges module 1 version 1, module 1 version 2 and part of the participants
   # and handles participants who have completed.
   
+  specified_m1_vars <- paste0(specified_m1_vars, collapse = ", ")
+    
   billing <- project
   
   ### Define Helper Functions
@@ -15,41 +17,43 @@ get_merged_module_1_data <- function(project) {
   ### Get both versions of Recruitment data for Module 1 from BQ
   ##517311251 Date/time Status of Completion of Background and Overall Health SrvBOH_TmComplete_v1r0
   ##949302066 Flag for Baseline Module Background and Overall Health SrvBOH_BaseStatus_v1r0
-  sql_rec_m1 <- glue("SELECT token, Connect_ID, d_821247024, d_914594314,",
+  sql_rec_m1 <- glue::glue("SELECT token, Connect_ID, d_821247024, d_914594314,",
                      "d_827220437, d_512820379, d_949302066 , d_517311251,",
                      "d_205553981 ",
                      "FROM  `{project}.FlatConnect.participants_JP` ",
                      "WHERE  Connect_ID IS NOT NULL AND d_821247024='197316935' AND d_831041022='104430631'")
-  query_recr_m1 <- bq_project_query(project, query=sql_rec_m1)
-  recr_m1 <- bq_table_download(query_recr_m1,bigint = "integer64")
+  query_recr_m1 <- bigrquery::bq_project_query(project, query=sql_rec_m1)
+  recr_m1 <- bigrquery::bq_table_download(query_recr_m1,bigint = "integer64")
   cnames <- names(recr_m1)
   
   ### Check Variables and Convert to Numeric
   
   for (i in 1: length(cnames)){
     varname <- cnames[i]
-    var     <- pull(recr_m1,varname)
+    var     <- dplyr::pull(recr_m1,varname)
     recr_m1[,cnames[i]] <- 
       ifelse(numbers_only(var), as.numeric(as.character(var)), var)
   }
   
   ### Get both versions of Module 1 from BQ
-  sql_m1_v1   <- glue("SELECT * FROM `{project}.FlatConnect.module1_v1_JP` ",
-                      "where Connect_ID is not null")
-  query_m1_v1 <- bq_project_query(project, query=sql_m1_v1)
-  M1_V1 <- bq_table_download(query_m1_v1,bigint = "integer64")
+  sql_m1_v1   <- glue::glue("SELECT {specified_m1_vars} ",
+                      "FROM `{project}.FlatConnect.module1_v1_JP` ",
+                      "WHERE Connect_ID IS NOT NULL")
+  query_m1_v1 <- bigrquery::bq_project_query(project, query=sql_m1_v1)
+  M1_V1 <- bigrquery::bq_table_download(query_m1_v1,bigint = "integer64")
   
-  sql_m1_v2   <- glue("SELECT * FROM `{project}.FlatConnect.module1_v2_JP` ",
-                      "where Connect_ID is not null")
-                      query_m1_v2 <- bq_project_query(project, query=sql_m1_v2)
-                      M1_V2 <- bq_table_download(query_m1_v2,bigint = "integer64")
+  sql_m1_v2   <- glue::glue("SELECT {specified_m1_vars} ",
+                      "FROM `{project}.FlatConnect.module1_v2_JP` ",
+                      "WHERE Connect_ID IS NOT NULL")
+                      query_m1_v2 <- bigrquery::bq_project_query(project, query=sql_m1_v2)
+                      M1_V2 <- bigrquery::bq_table_download(query_m1_v2,bigint = "integer64")
                       
                       # Check Variables and Convert to Numeric
                       mod1_v1 <- M1_V1
                       cnames <- names(M1_V1)
                       for (i in 1: length(cnames)){
                         varname <- cnames[i]
-                        var<-pull(mod1_v1,varname)
+                        var<-dplyr::pull(mod1_v1,varname)
                         mod1_v1[,cnames[i]] <- 
                           ifelse(numbers_only(var), as.numeric(as.character(var)), var)
                       }
@@ -58,7 +62,7 @@ get_merged_module_1_data <- function(project) {
                       cnames <- names(M1_V2)
                       for (i in 1: length(cnames)){
                         varname <- cnames[i]
-                        var<-pull(mod1_v2,varname)
+                        var<-dplyr::pull(mod1_v2,varname)
                         mod1_v2[,cnames[i]] <-
                           ifelse(numbers_only(var), as.numeric(as.character(var)), var)
                       }
@@ -67,6 +71,9 @@ get_merged_module_1_data <- function(project) {
                       ### Begin Merging Steps
                       M1_V1.var <- colnames(M1_V1)
                       M1_V2.var <- colnames(M1_V2)
+#                      print('M1_V1 columns: ', M1_V1.var)
+#                      print('M1_V1 columns: ', M1_V1.var)
+                      
                       var.matched <- M1_V1.var[which(M1_V1.var %in% M1_V2.var)]
                       length(var.matched)  
                       
@@ -127,7 +134,7 @@ get_merged_module_1_data <- function(project) {
                       
                       ### Join the Participants table to Merged Module 1 Data
                       parts <-
-                        glue(
+                        glue::glue(
                           "SELECT Connect_ID, token, d_512820379, d_471593703, ",
                           "state_d_934298480, d_230663853, d_335767902,",
                           "d_982402227, d_919254129, d_699625233, d_564964481, ",
@@ -137,12 +144,13 @@ get_merged_module_1_data <- function(project) {
                           "FROM `{project}.FlatConnect.participants_JP` ",
                           "WHERE Connect_ID IS NOT NULL"
                         )
-                      parts_table <- bq_project_query(project, parts)
-                      parts_data <- bq_table_download(parts_table, 
+                      parts_table <- bigrquery::bq_project_query(project, parts)
+                      parts_data <- bigrquery::bq_table_download(parts_table, 
                                                       bigint="integer64")
                       
                       #need to convert type- m1 is double & parts is character
-                      parts_data$Connect_ID <- as.numeric(parts_data$Connect_ID) 
+                      m1_complete_nodup$Connect_ID <- as.character(m1_complete_nodup$Connect_ID)
+                      parts_data$Connect_ID <- as.character(parts_data$Connect_ID) 
                       
                       merged <- left_join(m1_complete_nodup, parts_data, 
                                           by = "Connect_ID")
