@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "recruitment" # "recruitment", "biospecimen", "module1" or "module2"
+module      <- "module4" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
 testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
@@ -23,8 +23,6 @@ library(glue)
 library(janitor)
 library(config)
 library(writexl)
-# library(plyr)
-
 
 
 # Configure system variables for local run
@@ -812,22 +810,45 @@ if (loadFromBQ){
   else if (QC_REPORT == "module1") {
     source("get_merged_module_1_data.R")
     data <- get_merged_module_1_data(project)
+
+# -------------------------------------------------------------------------
+
+    
+    # Deal with exceptions 
+    source("check_and_correct_exceptions.R")
+    exceptions <- config::get(value="exceptions", config = "module1")
+    exceptions <- union(names(data), exceptions) # get only the ones that are actually in the df
+    data <- check_and_correct_exceptions(data, exceptions)
   }
   else if (QC_REPORT == "module2") {
     source("get_merged_module_2_data.R")
     data <- get_merged_module_2_data(project)
+    
+    # Deal with exceptions
+    source("check_and_correct_exceptions.R")
+    exceptions <- config::get(value="exceptions", config = "module2")
+    exceptions <- union(names(data), exceptions) # get only the ones that are actually in the df
+    data <- check_and_correct_exceptions(data, exceptions)
   }
   else if (QC_REPORT == "module3") {
-    tables              <- c('module3_v1_JP')
-    where_clause        <- ""
-    download_in_chunks  <- FALSE
-    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+    source("get_merged_module_3_data.R")
+    data <- get_merged_module_3_data(project)
+    
+    # Deal with exceptions 
+    source("check_and_correct_exceptions.R")
+    exceptions <- config::get(value="exceptions", config = "module3")
+    exceptions <- union(names(data), exceptions) # get only the ones that are actually in the df
+    data <- check_and_correct_exceptions(data, exceptions)
   }
   else if (QC_REPORT == "module4") {
-    tables              <- c('module4_v1_JP')
-    where_clause        <- ""
-    download_in_chunks  <- FALSE
-    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+    source("get_merged_module_4_data.R")
+    data <- get_merged_module_4_data(project)
+    
+    # Deal with exceptions 
+    source("check_and_correct_exceptions.R")
+    exceptions <- config::get(value="exceptions", config = "module4")
+    exceptions <- union(names(data), exceptions) # get only the ones that are actually in the df
+    data <- check_and_correct_exceptions(data, exceptions)
   }
   # Add a row of indices so that we can refer back to the original position later
   # after filtering
