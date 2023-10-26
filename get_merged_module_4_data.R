@@ -32,7 +32,9 @@ get_merged_module_4_data <- function(project) {
   mod1_vars <- c("Connect_ID", "D_784967158")
   
   source("get_merged_module_1_data.R")
-  mod_1_data <- get_merged_module_1_data(project, specified_m1_vars = mod1_vars)
+  mod_1_data <- get_merged_module_1_data(project, specified_m1_vars = mod1_vars, merge_participants_table=FALSE) %>%
+    mutate_all(as.character)
+  mod_1_data[,'version'] <- NULL
   #mod_1_data$Connect_ID <- as.character(mod_1_data$Connect_ID)
   merged <- dplyr::left_join(merged_mod4_parts_data, mod_1_data, by = "Connect_ID")
   
