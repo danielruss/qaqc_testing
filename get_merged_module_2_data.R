@@ -123,11 +123,13 @@ get_merged_module_2_data <- function(project) {
   table(M2_complete_nodup$version)
   
   
-  M2_complete_nodup$Connect_ID <- as.numeric(M2_complete_nodup$Connect_ID)
+  M2_complete_nodup$Connect_ID <- as.character(M2_complete_nodup$Connect_ID)
   
   ##### Get Module 1 Data #####
   # Note, this returns M1V1, M1V2 and some Recruitment data
   merge_m1 <- get_merged_module_1_data(project)
+  merge_m1$Connect_ID <- as.character(merge_m1$Connect_ID)
+
   
   ##### Merge Module 1 and Module 2 Data #####
   data <- left_join(M2_complete_nodup, merge_m1, by="Connect_ID")
