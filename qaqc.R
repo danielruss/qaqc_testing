@@ -2,8 +2,8 @@
 #############    Define Parameters Here IF Running Locally    ##################
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
-tier        <- "prod" # "prod" or "stg"
-module      <- "module4" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
+tier        <- "stg" # "prod" or "stg"
+module      <- "module2" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
 testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
@@ -504,6 +504,19 @@ na_or_has_less_than_or_equal_n_characters <-na_ok(has_less_than_or_equal_n_chara
 crossvalid_has_less_than_or_equal_n_characters <- crossvalidly(has_less_than_or_equal_n_characters)
 na_or_crossvalid_has_less_than_or_equal_n_characters <- na_ok(crossvalid_has_less_than_or_equal_n_characters)
 
+# Check for valid time (0-23):(0-59)
+is_24hr_time <-function(data,ids,...){
+  l=list(...)
+  valid_time <- function(x){grepl("^(?:[01]\\d|2[0-3]):([0-5]\\d)$",x)}
+  failed <- data %>% filter(!valid_time(!!sym(l$ConceptID)))
+  l <- prepare_list_for_report(l)
+  prepare_report(failed,l,{{ids}})
+}
+na_or_is_24hr_time <- na_ok(is_24hr_time)
+crossvalid_is_24hr_time <- crossvalidly(is_24hr_time)
+na_or_crossvalid_is_24hr_time <- na_ok(crossvalid_is_24hr_time)
+
+
 # NOTE: This was needed to report bad rules
 find_errors <- function(rules,data){
   rules %>% mutate(
@@ -574,7 +587,11 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(Qctype=="match cid values") %>% pmap_dfr(match_cid_values,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="crossvalid match cid values") %>% pmap_dfr(crossvalid_match_cid_values,data=data,ids={{ids}},date=run_date),
     rules %>% filter(Qctype=="na or match cid values") %>% pmap_dfr(na_or_match_cid_values,data=data,ids={{ids}},date=run_date),
-    rules %>% filter(Qctype=="na or crossvalid match cid values") %>% pmap_dfr(na_or_crossvalid_match_cid_values,data=data,ids={{ids}},date=run_date)
+    rules %>% filter(Qctype=="na or crossvalid match cid values") %>% pmap_dfr(na_or_crossvalid_match_cid_values,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="is 24hr time") %>% pmap_dfr(is_24hr_time,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or is 24hr time") %>% pmap_dfr(na_or_is_24hr_time,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="crossValid1 or is 24hr time") %>% pmap_dfr(crossvalid_is_24hr_time,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(Qctype=="NA or CrossValid1 is 24hr time") %>% pmap_dfr(na_or_crossvalid_is_24hr_time,data=data,ids={{ids}},date=run_date)
   )
 }
 
