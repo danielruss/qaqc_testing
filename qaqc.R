@@ -808,8 +808,6 @@ if (loadFromBQ){
     data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
   }
   else if (QC_REPORT == "module1") {
-    print(getwd())
-    print(dir())
     source("get_merged_module_1_data.R")
     data <- get_merged_module_1_data(project)
 
