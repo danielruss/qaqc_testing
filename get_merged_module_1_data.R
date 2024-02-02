@@ -141,7 +141,7 @@ get_merged_module_1_data <- function(project, specified_m1_vars = c("Connect_ID"
         "d_982402227, d_919254129, d_699625233, d_564964481, ",
         "d_795827569, d_544150384, d_371067537, d_430551721, ",
         "d_821247024, d_914594314, d_827220437, d_949302066, ",
-        "d_517311251, d_205553981, d_117249500",
+        "d_517311251, d_205553981, d_117249500,",
         "d_100767870, d_536735468, d_976570371, d_663265240 ",
         "FROM `{project}.FlatConnect.participants_JP` ",
         "WHERE Connect_ID IS NOT NULL"
