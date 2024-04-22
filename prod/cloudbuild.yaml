@@ -18,5 +18,9 @@ steps:
 options:
   logging: CLOUD_LOGGING_ONLY
 
+tags:
+  - reporting_pipeline
+  - qaqc
+  
 images:
   - 'gcr.io/nih-nci-dceg-connect-prod-6d04/generic-qaqc:$COMMIT_SHA'
