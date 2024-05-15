@@ -3,8 +3,8 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "module1" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
-testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+module      <- "recruitment" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
+testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -290,6 +290,47 @@ na_ok <- function(f){
   }
 }
 
+#' Modify a validation function by filtering rows based on date comparison.
+#'
+#' @param f A validation function to be modified.
+#' @param data Data frame to apply the validation function to.
+#' @param ids Vector of IDs to pass to the validation function.
+#' @param date_cid String specifying the column containing dates (default: 'd_205553981').
+#' @param date_to_compare String representing the comparison date in "YYYY-MM-DDThh:mm:ss.sssZ" format.
+#' @param date_comparison String specifying the comparison operator (e.g., "<", ">", "<=", ">=").
+#' @param ... Additional arguments passed to the validation function `f`.
+#'
+#' @return Data frame filtered by both the validation function `f` and the date comparison.
+#'
+#' @import dplyr
+#' @importFrom lubridate ymd_hms
+#' @importFrom glue glue
+#' @export
+except_dates <- function(f) {
+
+  function(data, ids, 
+           date_cid = 'd_205553981', 
+           date_to_compare = "2023-05-26T00:00:00.000Z", 
+           date_comparison = "<", ...) {
+    # Ensure that lubridate is available
+    if (!requireNamespace("lubridate", quietly = TRUE)) {
+      stop("The 'lubridate' package is required but not installed.")
+    }
+    
+    l <- list(...)
+    concept_col <- ifelse(!is.null(l$ConceptID), l$ConceptID, date_cid)
+    
+    # Construct the comparison expression correctly
+    expression_string <- glue::glue(
+      "lubridate::ymd_hms({{ concept_col }}) {date_comparison} lubridate::ymd_hms('{date_to_compare}')"
+    )
+    
+    f(data, ids = {{ ids }}, ...) %>%
+      dplyr::filter(eval(parse(text = expression_string)))
+  }
+}
+
+
 # Applies validation rules to check data validity based on provided concept ID 
 # and valid values. Filters report rows based on validation results.
 valid <- function(data,ids,...){
@@ -513,6 +554,8 @@ na_or_has_less_than_or_equal_n_characters <-na_ok(has_less_than_or_equal_n_chara
 crossvalid_has_less_than_or_equal_n_characters <- crossvalidly(has_less_than_or_equal_n_characters)
 na_or_crossvalid_has_less_than_or_equal_n_characters <- na_ok(crossvalid_has_less_than_or_equal_n_characters)
 
+
+
 # Check for valid time (0-23):(0-59)
 is_24hr_time <-function(data,ids,...){
   l=list(...)
@@ -615,7 +658,7 @@ loadData <- function(project, table, where_clause,
                      start_index = start_index, 
                      n_max = n_max) {
   
-    q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s ORDER BY token", # DESC",
+    q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s ORDER BY token DESC",
                  project, table, where_clause)
     
     if (n_max != Inf) {
