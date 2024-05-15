@@ -7,6 +7,7 @@ default:
   box_app: NCI_BOX_GCP_CONNECT4CANCER_PROD
   box_folder: "211674408263"
   flag: ""
+  exclusions_file: ""
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
@@ -15,11 +16,13 @@ biospecimen:
 recruitment:
   QC_REPORT: recruitment
   rules_file: qc_rules_recruitment.xlsx
+  exclusions_file: "exclusions/qc_exclusions_recruitment.csv"
 module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
   flag: "export2box"
   box_folder: "203464977998"
+  exclusions_file: "exclusions/qc_exclusions_module.csv"
 module2:
   QC_REPORT: module2
   rules_file: qc_rules_module2.xlsx
