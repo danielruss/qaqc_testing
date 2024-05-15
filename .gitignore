@@ -17,4 +17,3 @@ out.xlsx
 .vscode*
 Rprof.out
 uninvited_participants_qc.R
-*.csv

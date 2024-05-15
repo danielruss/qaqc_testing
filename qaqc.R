@@ -2,9 +2,9 @@
 #############    Define Parameters Here IF Running Locally    ##################
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/qaqc_testing" #set to your working dir
-tier        <- "stg" # "prod" or "stg"
-module      <- "module2" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
-testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+tier        <- "prod" # "prod" or "stg"
+module      <- "recruitment" # "recruitment", "biospecimen", "module1", "module2", "module3", or "module4"
+testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -29,7 +29,7 @@ library(writexl)
 if (local_drive == getwd() & testing_api == FALSE) {
   Sys.setenv(R_CONFIG_ACTIVE = module) # configuration to use
   Sys.setenv(R_CONFIG_FILE = glue("{tier}/config.yml")) # config path
-  Sys.setenv(MIN_RULE = 1)     # rule to start at
+  Sys.setenv(MIN_RULE = 0)     # rule to start at
   Sys.setenv(MAX_RULE = 10000) # rule to end at (pick large value to run all)
   Sys.setenv(START_INDEX = 0)
   Sys.setenv(N_MAX = Inf)
@@ -50,6 +50,7 @@ max_rule      <- Sys.getenv("MAX_RULE")
 start_index   <- as.numeric(Sys.getenv("START_INDEX"))
 n_max         <- as.numeric(Sys.getenv("N_MAX"))
 sheet         <- NULL
+exclusions_fid <- config::get("exclusions_file")
 
 #Authenticate to bigrquery
 bq_auth()
@@ -61,8 +62,13 @@ report_fid <-
   paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
+
+# Fix the "No permanent teeth lost" issue with the Connnect data dictionary
+dictionary$`104430631`$`Variable Label` <- "No"
+dictionary$`104430631`$`Variable Name` <- "No"
+
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
-#dl <-  dictionary %>% map(~.x[["Variable Name"]] %||% .x[["Variable Label"]]) %>% compact()
+
 
 
 
@@ -86,6 +92,7 @@ dictionary_lookup <- function(x){
   x <- relist(x,skel)
   class(x) <- "list"
   x
+  
 }
 
 # Convert comma sep vals to vector, handling caveats
@@ -101,7 +108,7 @@ convertToVector <- function(x){
 # your %!in% function is not my favorite, but infix operator are cool so +1. I'm surprise
 # your function works.  I changed the syntax a bit to make it slightly more standard.
 # Be careful in using this pipes, which I think are much cooler and easier to read.
-`%!in%` <- function(x,y){ !`%in%`(x,y) }
+`%!in%`   <- function(x,y){ !`%in%`(x,y) }
 `%in|na%` <- function(x,y){ is.na(x) | x %in% y }
 
 # I'm not really happy with this function...  I would like to pass
@@ -153,7 +160,8 @@ prepare_list_for_report<-function(arg_list){
 # data tibble and applying the necessary transformations based on provided rules.
 prepare_report <- function(data,l,ids){
   data %>%
-    mutate(site_id=data$d_827220437,
+    mutate(rule_id=l$rule_id,
+           site_id=data$d_827220437,
            site=dictionary_lookup(site_id),
            invalid_values=as.character(!!sym(l$ConceptID)),
            invalid_values_lookup=dictionary_lookup(!!sym(l$ConceptID)),
@@ -189,6 +197,7 @@ prepare_report <- function(data,l,ids){
     )  %>%
     select(Connect_ID,
            token,
+           rule_id,
            site_id,
            site,
            qc_test,
@@ -221,7 +230,7 @@ prepare_report <- function(data,l,ids){
            #CrossVariable4Value,
            CrossVariableConceptValidValue4,
            CrossVariableConceptValidValue4_lookup,
-           index,
+           #index,
            {{ids}})
 }
 
@@ -281,13 +290,54 @@ na_ok <- function(f){
   }
 }
 
+#' Modify a validation function by filtering rows based on date comparison.
+#'
+#' @param f A validation function to be modified.
+#' @param data Data frame to apply the validation function to.
+#' @param ids Vector of IDs to pass to the validation function.
+#' @param date_cid String specifying the column containing dates (default: 'd_205553981').
+#' @param date_to_compare String representing the comparison date in "YYYY-MM-DDThh:mm:ss.sssZ" format.
+#' @param date_comparison String specifying the comparison operator (e.g., "<", ">", "<=", ">=").
+#' @param ... Additional arguments passed to the validation function `f`.
+#'
+#' @return Data frame filtered by both the validation function `f` and the date comparison.
+#'
+#' @import dplyr
+#' @importFrom lubridate ymd_hms
+#' @importFrom glue glue
+#' @export
+except_dates <- function(f) {
+
+  function(data, ids, 
+           date_cid = 'd_205553981', 
+           date_to_compare = "2023-05-26T00:00:00.000Z", 
+           date_comparison = "<", ...) {
+    # Ensure that lubridate is available
+    if (!requireNamespace("lubridate", quietly = TRUE)) {
+      stop("The 'lubridate' package is required but not installed.")
+    }
+    
+    l <- list(...)
+    concept_col <- ifelse(!is.null(l$ConceptID), l$ConceptID, date_cid)
+    
+    # Construct the comparison expression correctly
+    expression_string <- glue::glue(
+      "lubridate::ymd_hms({{ concept_col }}) {date_comparison} lubridate::ymd_hms('{date_to_compare}')"
+    )
+    
+    f(data, ids = {{ ids }}, ...) %>%
+      dplyr::filter(eval(parse(text = expression_string)))
+  }
+}
+
+
 # Applies validation rules to check data validity based on provided concept ID 
 # and valid values. Filters report rows based on validation results.
 valid <- function(data,ids,...){
   #message("... Running valid")
   # ok, this is a difficult concept, but the conceptId is passed in as string.
   # if you try to say "is the value of the conceptId that I passed in within a set of valid values
-  # you would be testing in the string "d_xxxxxxx" is in the set of value values.  We need to let
+  # you would be testing if the string "d_xxxxxxx" is in the set of value values.  We need to let
   # R know that is a variable name (a symbol).  So we convert the conceptId to a symbol.  Then
   # we need to ask R if the value that the symbol points is in the set of valid values, not the symbol
   # itself.  So the !! dereferences the symbol to the value.
@@ -327,9 +377,9 @@ na_or_crossvalid <- na_ok(crossvalid)
 match_cid_values <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
   # select all the invalid rows
-  print('made it to 308')
+  #print('made it to 308')
   failed <- data %>% filter( !!sym(l$ConceptID) != getCIDValue(l$ValidValues,data) )
-  print('made it to 310')
+  #print('made it to 310')
   l <- prepare_list_for_report(l)
   prepare_report(failed,l,{{ids}})
 }
@@ -376,7 +426,7 @@ isPopulated <- function(data,ids,...){
 }
 crossvalidIsPopulated <- crossvalidly(isPopulated)
 
-# Filter values that are NA
+# Filter values that are not NA
 isNotPopulated <- function(data,ids,...){
   l=list(...) # Column names that are passed in ...
   
@@ -504,6 +554,8 @@ na_or_has_less_than_or_equal_n_characters <-na_ok(has_less_than_or_equal_n_chara
 crossvalid_has_less_than_or_equal_n_characters <- crossvalidly(has_less_than_or_equal_n_characters)
 na_or_crossvalid_has_less_than_or_equal_n_characters <- na_ok(crossvalid_has_less_than_or_equal_n_characters)
 
+
+
 # Check for valid time (0-23):(0-59)
 is_24hr_time <-function(data,ids,...){
   l=list(...)
@@ -534,12 +586,19 @@ find_errors <- function(rules,data){
 }
 report_bad_rules <- function(...){
   l=list(...)
-  return(tibble(qc_test=l$Qctype,ConceptID=l$ConceptID,date=l$date,ValidValues=list(l$ValidValues),rule_error=l$error,rule_label=l$Label,
+  return(tibble(rule_id=l$rule_id,
+                qc_test=l$Qctype,
+                ConceptID=l$ConceptID,
+                date=l$date,
+                ValidValues=list(l$ValidValues),
+                rule_error=l$error,rule_label=l$Label,
                 CrossVariableConceptID1=l$CrossVariableConceptID1,CrossVariable1Value="",CrossVariableConceptValidValue1=list(l$CrossVariableConceptID1Value),
                 CrossVariableConceptID2=l$CrossVariableConceptID2,CrossVariable2Value="",CrossVariableConceptValidValue2=list(l$CrossVariableConceptID2Value),
                 CrossVariableConceptID3=l$CrossVariableConceptID3,CrossVariable3Value="",CrossVariableConceptValidValue3=list(l$CrossVariableConceptID3Value),
-                CrossVariableConceptID4=l$CrossVariableConceptID4,CrossVariable4Value="",CrossVariableConceptValidValue4=list(l$CrossVariableConceptID4Value)
-  ))
+                CrossVariableConceptID4=l$CrossVariableConceptID4,CrossVariable4Value="",CrossVariableConceptValidValue4=list(l$CrossVariableConceptID4Value),
+                notes=l$`Notes from QC process`,
+                rule_label=l$Label,
+                .name_repair="universal"))
 }
 
 runQC <- function(data, rules, QC_report_location,ids){
@@ -595,68 +654,41 @@ runQC <- function(data, rules, QC_report_location,ids){
   )
 }
 
-loadData <- function(project, tables, where_clause, download_in_chunks=TRUE) {
+loadData <- function(project, table, where_clause, 
+                     start_index = start_index, 
+                     n_max = n_max) {
   
-  data <- list()
-  for (table in tables) {
+    q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s ORDER BY token DESC",
+                 project, table, where_clause)
     
-    if (!download_in_chunks) {
-      
-      q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s",
-                   project, table, where_clause)
-      tb  <- bq_project_query(project, query=q)
-      data[[table]] <- bq_table_download(tb, 
-                                         bigint="integer64", 
-                                         page_size=1000, 
-                                         start_index=start_index,
-                                         n_max=n_max)
-      
+    if (n_max != Inf) {
+      LIMIT <- sprintf("LIMIT %s", as.character(as.integer(n_max)))
     } else {
-      
-      query  <- sprintf("SELECT * FROM `%s.FlatConnect`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name='%s'", project, table)
-      vars   <- bq_project_query(project, query=query)
-      vars_  <- bigrquery::bq_table_download(vars,bigint = "integer64")
-      vars_d <- vars_[grepl("d_",vars_$column_name),]
-      # print(paste0(table,' has these variables: '))
-      # print(vars_$column_name)
-      
-      # Define range of data to download per chunk
-      nvar   <- floor((length(vars_d$column_name))/12) # num vars to per query
-      start  <- seq(1,length(vars_d$column_name),nvar)
-      end    <- length(vars_d$column_name)
-      
-      # Loop through groups of columns and build up bq_data dataset
-      bq_data <- list()
-      for (i in (1:length(start)))  {
-        select <- paste(vars_d$column_name[start[i]:(min(start[i]+nvar-1,end))],
-                        collapse=",")
-        q <- sprintf("SELECT token, Connect_ID, %s FROM `%s.FlatConnect.%s` %s",
-                     select, project, table, where_clause)
-        tmp <- bq_project_query(project, query=q)
-        bq_data[[i]] <- bq_table_download(tmp, 
-                                          bigint="integer64", 
-                                          page_size=1000,
-                                          start_index=start_index,
-                                          n_max=n_max)
-      }
-      
-      # Join list of datasets into single dateset
-      join_keys     <- c("token", "Connect_ID")
-      data[[table]] <- bq_data %>% reduce(inner_join, by = join_keys)
-      
+      LIMIT <- ""
     }
     
-  }
-  
-  if (length(data) > 1){
-    join_keys <- c("Connect_ID", "token", "d_827220437")
-    #print(paste0("566: ", data))
-    data      <- data %>% reduce(left_join, by = join_keys)
-    #data <- left_join(data[[1]], data[[2]], by =c("Connect_ID", "token", "d_827220437"))
-  } else {
-    data <- data[[1]]
-  }
-  
+    if (start_index > 0) {
+      OFFSET <- sprintf("OFFSET %s", as.character(as.integer(start_index)))
+    } else {
+      OFFSET <- ""
+    }
+    
+    q <- glue("SELECT * 
+               FROM `{project}.FlatConnect.{table}` 
+               {where_clause} 
+               ORDER BY token
+               {LIMIT}
+               {OFFSET}")
+    print(q)
+    tb   <- bq_project_query(project, query=q)
+    data <- bq_table_download(tb, 
+                              bigint="integer64", 
+                              # page_size=1000, 
+                              # start_index=start_index,
+                              n_max=n_max,
+                              quiet=TRUE)
+    
+    return(data)
 }
 
 get_explanation <- function(x, data) {
@@ -816,13 +848,17 @@ if (loadFromBQ){
   
   if (QC_REPORT == "biospecimen") {
     source("get_merged_biospecimen_and_recruitment_data.R")
-    data <- get_merged_biospecimen_and_recruitment_data(project, exclude_duplicates=TRUE)
+    data <- get_merged_biospecimen_and_recruitment_data(project, 
+                                                        exclude_duplicates=TRUE)
   }
   else if (QC_REPORT == "recruitment") {
     tables              <- c('participants_JP')
-    where_clause        <- "WHERE d_831041022='104430631'"
-    download_in_chunks  <- FALSE
-    data <- loadData(project, tables, where_clause, download_in_chunks=download_in_chunks)
+    where_clause        <- "WHERE d_831041022='104430631'" # AND TIMESTAMP(d_914594314) >= TIMESTAMP('2023-12-01T00:00:00.000Z')"
+    data <- loadData(project, 
+                     tables, 
+                     where_clause, 
+                     start_index=start_index, 
+                     n_max=n_max)
   }
   else if (QC_REPORT == "module1") {
     source("get_merged_module_1_data.R")
@@ -869,7 +905,7 @@ if (loadFromBQ){
   }
   # Add a row of indices so that we can refer back to the original position later
   # after filtering
-  data$index <- 1:nrow(data)
+  # data$index <- 1:nrow(data)
   
 }else{
   data_file <- "data.json"
@@ -935,7 +971,7 @@ if (length(x)==0) {
 
   
   # Alter column order
-  col_order <- c("Connect_ID", "token",
+  col_order <- c("Connect_ID", "token", "rule_id",
                  "site_id", "site",
                  "qc_test", "rule_error", "rule_label", "ConceptID", "ConceptID_lookup",
                  "ValidValues", "ValidValues_lookup", "invalid_values",
@@ -944,10 +980,29 @@ if (length(x)==0) {
                  "CrossVariableConceptID3", "CrossVariableConceptID3_lookup", "CrossVariableConceptValidValue3", "CrossVariableConceptValidValue3_lookup",
                  "CrossVariableConceptID4", "CrossVariableConceptID4_lookup", "CrossVariableConceptValidValue4", "CrossVariableConceptValidValue4_lookup",
                  "date", "explanation")
-  x <- x[, col_order]
+  x <- x[, col_order] 
   
-  # Write report and rules to separate sheets of excel file
-  writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+  if (!is.null(exclusions_fid) && exclusions_fid != "") {
+    # Read in exclusions file
+    exclusions <- read.csv(exclusions_fid)
+    # Remove exclusions from report
+    
+    idx_exclusions <- which(x$rule_id %in% exclusions$rule_id & 
+                            x$token %in% exclusions$token)
+    report_df      <- x[-idx_exclusions,]
+    report_df$toIgnore <- rep("FALSE", nrow(report_df))
+
+    exclusions_df  <- x[idx_exclusions,]
+    exclusions_df$toIgnore <- rep("TRUE", nrow(exclusions_df))
+    
+    # Write report and rules to separate sheets of excel file
+    writexl::write_xlsx(list(report=report_df, exclusions=exclusions_df, rules=rules), report_fid)
+  } else {
+    # Write report and rules to separate sheets of excel file
+    x$toIgnore <- rep("FALSE", nrow(x))
+    writexl::write_xlsx(list(report=x, rules=rules), report_fid)
+  }
+  
   print(glue("{report_fid} save to local drive."))
 
   
