@@ -1,5 +1,6 @@
 # qaqc_testing
 
+
 A repository for the Connect4Cancer QAQC process.
 
 qaqc.R is a script that is used to generate a qc_report (excel), given a query to a BQ dataset (FlatConnect.participants_JP or FlatConnect.biospecimen_JP) and a qc_rules file (excel). The code was written by Daniel Russ in August 2022 and has been maintained by Jake Peters since January 2023.
