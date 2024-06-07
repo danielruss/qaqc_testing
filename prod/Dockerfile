@@ -16,4 +16,6 @@ COPY ["./qc_rules_module2.xlsx", "./qc_rules_module2.xlsx"]
 COPY ["./qc_rules_module3.xlsx", "./qc_rules_module3.xlsx"]
 COPY ["./qc_rules_module4.xlsx", "./qc_rules_module4.xlsx"]
 COPY ["./exclusions/qc_exclusions_recruitment.csv", "./exclusions/qc_exclusions_recruitment.csv"]
+COPY ["./exclusions/qc_exclusions_module.csv", "./exclusions/qc_exclusions_module.csv"]
+
 ENTRYPOINT ["R", "-e", "pr <- plumber::plumb('api.R'); pr$run(host='0.0.0.0', port=as.numeric(Sys.getenv('PORT')))"]
