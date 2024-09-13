@@ -28,5 +28,5 @@ get_merged_biospecimen_and_recruitment_data <-
     data <- data %>% filter(!(Connect_ID %in% Connect_IDs_to_exclude))
   }
   print(glue("length data after filter: {length(data)}"))
-  data
+  return(data)
 }
