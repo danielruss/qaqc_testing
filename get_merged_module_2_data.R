@@ -8,18 +8,21 @@ get_merged_module_2_data <- function(project) {
   library(glue)
   library(bigrquery)
 
-  # devtools::install_github("tidyverse/reprex")
+
   `%!in%` <- function(x,y){ !`%in%`(x,y) }
 
   billing <- project
 
   ##517311251 Date/time Status of Completion of Background and Overall Health [SrvBOH_TmComplete_v1r0]
   ##949302066 Flag for Baseline Module Background and Overall Health          [SrvBOH_BaseStatus_v1r0]
-  recr_M1 <- bq_project_query(project,
-                              query=glue("SELECT token, Connect_ID, d_821247024, d_914594314,  d_827220437,
-                d_512820379, d_949302066 , d_517311251
-              FROM  `{project}.FlatConnect.participants_JP`
-              WHERE  d_821247024='197316935'")
+
+  recr_M1 <- bq_project_query(
+    project,
+    query=glue(
+      "SELECT token, Connect_ID, d_821247024, d_914594314,  d_827220437,
+              d_512820379, d_949302066 , d_517311251
+       FROM  `{project}.FlatConnect.participants_JP`
+       WHERE  d_821247024='197316935'")
   )
   recr_m1 <- bq_table_download(recr_M1, bigint = "integer64")
   cnames <- names(recr_m1)
@@ -36,22 +39,25 @@ get_merged_module_2_data <- function(project) {
   #Only these variables carry over from mod1 into mod2:
   #sex, sex2, gen, work
   #Going to see if only these are selected, if it will allow the automation to run
-  sql_M1_1 <- bq_project_query(project,
-                               query = glue("SELECT
-                              Connect_ID, D_407056417, D_750420077_D_846483618,
-                              D_750420077_D_505282171, D_750420077_D_578416151, D_750420077_D_434651539,
-                              D_750420077_D_108025529, D_289664241_D_289664241, D_613744428
-                           FROM `{project}.FlatConnect.module1_v1_JP`
-                           WHERE Connect_ID IS NOT NULL")
+
+  sql_M1_1 <- bq_project_query(
+    project,
+    query = glue(
+      "SELECT Connect_ID, D_407056417, D_750420077_D_846483618,
+              D_750420077_D_505282171, D_750420077_D_578416151, D_750420077_D_434651539,
+              D_750420077_D_108025529, D_289664241_D_289664241, D_613744428
+       FROM `{project}.FlatConnect.module1_v1_JP`
+       WHERE Connect_ID IS NOT NULL")
   )
-  sql_M1_2 <- bq_project_query(project,
-                               query = glue("SELECT
-                              Connect_ID, D_407056417, D_750420077_D_582784267, D_750420077_D_751402477,
-                              D_750420077_D_700100953, D_750420077_D_846483618, D_750420077_D_505282171,
-                              D_750420077_D_578416151, D_750420077_D_434651539, D_750420077_D_108025529,
-                              D_289664241_D_289664241, D_613744428
-                           FROM `{project}.FlatConnect.module1_v2_JP`
-                           WHERE Connect_ID IS NOT NULL")
+  sql_M1_2 <- bq_project_query(
+    project,
+    query = glue(
+      "SELECT Connect_ID, D_407056417, D_750420077_D_582784267, D_750420077_D_751402477,
+              D_750420077_D_700100953, D_750420077_D_846483618, D_750420077_D_505282171,
+              D_750420077_D_578416151, D_750420077_D_434651539, D_750420077_D_108025529,
+              D_289664241_D_289664241, D_613744428
+       FROM `{project}.FlatConnect.module1_v2_JP`
+       WHERE Connect_ID IS NOT NULL")
   )
 
   M1_V1 <- bq_table_download(sql_M1_1,bigint = "integer64")
@@ -229,5 +235,6 @@ get_merged_module_2_data <- function(project) {
   module2= left_join(M2_complete_nodup, merged,  by="Connect_ID")
 
   data_tib_m2 <- as_tibble(module2)
-  data_tib_m2
+
+  return(data_tib_m2)
 }
