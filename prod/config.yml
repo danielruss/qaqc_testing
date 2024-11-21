@@ -22,11 +22,11 @@ module1:
   rules_file: qc_rules_module1.xlsx
   flag: "export2box"
   box_folder: "203464977998"
-  exclusions_file: "exclusions/qc_exclusions_module.csv"
 module2:
   QC_REPORT: module2
   rules_file: qc_rules_module2.xlsx
   flag: "export2box"
+  box_folder: "211160736918"
 module3:
   QC_REPORT: module3
   rules_file: qc_rules_module3.xlsx
@@ -34,4 +34,8 @@ module3:
 module4:
   QC_REPORT: module4
   rules_file: qc_rules_module4.xlsx
+  flag: "export2box"
+blood_urine_mouthwash:
+  QC_REPORT: blood_urine_mouthwash
+  rules_file: qc_rules_blood_urine_mouthwash.xlsx
   flag: "export2box"

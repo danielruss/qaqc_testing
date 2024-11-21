@@ -657,9 +657,6 @@ loadData <- function(project, table, where_clause,
                      start_index = start_index,
                      n_max = n_max) {
 
-    # q <- sprintf("SELECT * FROM `%s.FlatConnect.%s` %s ORDER BY token", # DESC",
-    #              project, table, where_clause)
-
     if (n_max != Inf) {
       LIMIT <- sprintf("LIMIT %s", as.character(as.integer(n_max)))
     } else {
@@ -675,7 +672,7 @@ loadData <- function(project, table, where_clause,
     q <- glue("SELECT *
                FROM `{project}.FlatConnect.{table}`
                {where_clause}
-               ORDER BY token DESC
+               ORDER BY token --DESC
                {LIMIT}
                {OFFSET}")
     print(q)
