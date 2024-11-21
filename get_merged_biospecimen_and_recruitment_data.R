@@ -9,7 +9,7 @@ get_merged_biospecimen_and_recruitment_data <-
            SELECT * FROM BIO LEFT JOIN PART ON PART.Connect_ID = BIO.Connect_ID"
   
   data_query <- bq_project_query(project, query = glue(sql1))
-  data <- bq_table_download(data_query, bigint = "integer64")
+  data <- bq_table_download(data_query, bigint = "integer64", page_size = 1000)
   
   print(glue("length data: {length(data)}"))
   

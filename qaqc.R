@@ -657,6 +657,7 @@ loadData <- function(project, table, where_clause,
                      start_index = start_index,
                      n_max = n_max) {
 
+
     if (n_max != Inf) {
       LIMIT <- sprintf("LIMIT %s", as.character(as.integer(n_max)))
     } else {
