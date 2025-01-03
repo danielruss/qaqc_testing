@@ -3,8 +3,10 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/7_qaqc" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "recruitment" #"blood_urine_mouthwash", "biospecimen", "module1", "module2", "module3", "module4", or "blood_urine_mouthwash"
-testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+module      <- "rca"
+# Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
+#          "module3", "module4", "blood_urine_mouthwash", "rca"
+testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -20,9 +22,7 @@ library(readxl)
 library(stringr)
 library(glue)
 library(janitor)
-library(config)
 library(writexl)
-
 
 # Configure system variables for local run
 if (local_drive == getwd() & testing_api == FALSE) {
@@ -48,6 +48,8 @@ min_rule      <- Sys.getenv("MIN_RULE")
 max_rule      <- Sys.getenv("MAX_RULE")
 start_index   <- as.numeric(Sys.getenv("START_INDEX"))
 n_max         <- as.numeric(Sys.getenv("N_MAX"))
+start_date    <- as.character(Sys.getenv("START_DATE"))
+end_date      <- as.character(Sys.getenv("END_DATE"))
 sheet         <- NULL
 exclusions_fid <- config::get("exclusions_file")
 
@@ -57,6 +59,7 @@ bq_auth()
 # Name of output/report file
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
+# rows_str   <- glue("{start_date}to{end_date}")
 report_fid <-
   paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
 
@@ -64,7 +67,7 @@ dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggr
 
 # Fix the "No permanent teeth lost" issue with the Connnect data dictionary
 dictionary$`104430631`$`Variable Label` <- "No"
-dictionary$`104430631`$`Variable Name` <- "No"
+dictionary$`104430631`$`Variable Name`  <- "No"
 
 dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>% compact()
 
@@ -90,7 +93,6 @@ dictionary_lookup <- function(x){
     modify_if(is.null,~"NA")
   x <- relist(x,skel)
   class(x) <- "list"
-  x
 
 }
 
@@ -672,7 +674,7 @@ loadData <- function(project, table, where_clause,
     q <- glue("SELECT *
                FROM `{project}.FlatConnect.{table}`
                {where_clause}
-               ORDER BY token --DESC
+               ORDER BY token DESC
                {LIMIT}
                {OFFSET}")
     print(q)
@@ -686,6 +688,10 @@ loadData <- function(project, table, where_clause,
 
     return(data)
 }
+
+library(bigrquery)
+library(glue)
+
 
 get_explanation <- function(x, data) {
   x <- x %>%
@@ -856,7 +862,14 @@ if (loadFromBQ){
                      start_index=start_index,
                      n_max=n_max)
   }
-  else if (QC_REPORT == "module1") {
+
+  else if (QC_REPORT == "rca") {
+    print(glue("QC_REPORT = {QC_REPORT}"))
+    source("get_merged_rca_data.R")
+    data <- get_merged_rca_data(project)
+
+  } else if (QC_REPORT == "module1") {
+
     source("get_merged_module_1_data.R")
     data <- get_merged_module_1_data(project)
 
@@ -865,8 +878,8 @@ if (loadFromBQ){
     exceptions <- config::get(value="exceptions", config = "module1")
     exceptions <- union(names(data), exceptions) # get only the ones that are actually in the df
     data <- check_and_correct_exceptions(data, exceptions)
-  }
-  else if (QC_REPORT == "module2") {
+
+  } else if (QC_REPORT == "module2") {
     source("get_merged_module_2_data.R")
     data <- get_merged_module_2_data(project)
 
@@ -907,7 +920,7 @@ if (loadFromBQ){
   # after filtering
   # data$index <- 1:nrow(data)
 
-}else{
+} else {
   data_file <- "data.json"
   data      <- rio::import(data_file) %>% tibble::as_tibble()
 }
@@ -936,7 +949,6 @@ rules <- rules[min_rule:max_rule,]
 
 # print( system.time(x <- runQC(data, rules,ids=Connect_ID)) )
 # Run QC report
-Rprof()
 x <- runQC(data, rules, ids=Connect_ID)
 
 if (length(x)==0) {
@@ -1005,7 +1017,6 @@ if (length(x)==0) {
 
   print(glue("{report_fid} save to local drive."))
 
-
   # Upload report to cloud storage if desired
   if (write_to_gcs) {
     print(glue("Uploading {report_fid} to {bucket}."))
@@ -1017,5 +1028,3 @@ if (length(x)==0) {
     print("Successfully uploaded to GCS Bucket.")
   }
 }
-Rprof(NULL)
-
