@@ -6,12 +6,11 @@ default:
   bucket: gs://ccc_weekly_metrics_report
   box_app: NCI_BOX_GCP_CONNECT4CANCER_PROD
   box_folder: "211674408263"
-  flag: ""
+  flag: "export2box"
   exclusions_file: ""
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
-  flag: "export2box"
   box_folder: "221297686961"
 recruitment:
   QC_REPORT: recruitment
@@ -20,22 +19,21 @@ recruitment:
 module1:
   QC_REPORT: module1
   rules_file: qc_rules_module1.xlsx
-  flag: "export2box"
   box_folder: "203464977998"
 module2:
   QC_REPORT: module2
   rules_file: qc_rules_module2.xlsx
-  flag: "export2box"
   box_folder: "211160736918"
 module3:
   QC_REPORT: module3
   rules_file: qc_rules_module3.xlsx
-  flag: "export2box"
 module4:
   QC_REPORT: module4
   rules_file: qc_rules_module4.xlsx
-  flag: "export2box"
 blood_urine_mouthwash:
   QC_REPORT: blood_urine_mouthwash
   rules_file: qc_rules_blood_urine_mouthwash.xlsx
-  flag: "export2box"
+rca:
+  QC_REPORT: rca
+  box_folder: "236420612811"
+  rules_file: qc_rules_rca.xlsx
