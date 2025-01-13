@@ -3,10 +3,10 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/7_qaqc" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "rca"
+module      <- "module4"
 # Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
 #          "module3", "module4", "blood_urine_mouthwash", "rca"
-testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -52,6 +52,10 @@ start_date    <- as.character(Sys.getenv("START_DATE"))
 end_date      <- as.character(Sys.getenv("END_DATE"))
 sheet         <- NULL
 exclusions_fid <- config::get("exclusions_file")
+load_from_bq  <- config::get("LOAD_FROM_BQ")
+# if (!exists(data_fid))  data_fid <- Sys.getenv("DATA_FID")
+# if (!exists(chunk_num)) chunk_num <- Sys.getenv("CHUNK_NUM")
+
 
 #Authenticate to bigrquery
 bq_auth()
@@ -60,8 +64,13 @@ bq_auth()
 rules_str  <- glue("rules{min_rule}to{max_rule}")
 rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
 # rows_str   <- glue("{start_date}to{end_date}")
-report_fid <-
-  paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
+if (load_from_bq == TRUE) {
+  report_fid <-
+    paste("results/qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "bq", ".xlsx", sep="_")
+} else {
+  report_fid <-
+    paste("results/qc_report", QC_REPORT, tier, Sys.Date(), "chunk", chunk_num, "boxfolder", boxfolder, ".xlsx", sep="_")
+}
 
 dictionary <- rio::import("https://episphere.github.io/conceptGithubActions/aggregate.json",format = "json")
 
@@ -674,9 +683,10 @@ loadData <- function(project, table, where_clause,
     q <- glue("SELECT *
                FROM `{project}.FlatConnect.{table}`
                {where_clause}
-               ORDER BY token DESC
-               {LIMIT}
-               {OFFSET}")
+               -- ORDER BY token DESC
+               -- {LIMIT}
+               -- {OFFSET}
+              ")
     print(q)
     tb   <- bq_project_query(project, query=q)
     data <- bq_table_download(tb,
@@ -845,8 +855,8 @@ get_explanation <- function(x, data) {
 
 #################### Start of Main Script ######################################
 #### YOU WILL WANT TO CHANGE THIS TO TRUE...
-loadFromBQ <- TRUE
-if (loadFromBQ){
+
+if (load_from_bq){
 
   if (QC_REPORT == "biospecimen") {
     source("get_merged_biospecimen_and_recruitment_data.R")
@@ -920,9 +930,6 @@ if (loadFromBQ){
   # after filtering
   # data$index <- 1:nrow(data)
 
-} else {
-  data_file <- "data.json"
-  data      <- rio::import(data_file) %>% tibble::as_tibble()
 }
 
 ## I need to load the rules file....
@@ -1027,4 +1034,5 @@ if (length(x)==0) {
     gcs_upload(report_fid, bucket=bucket, name=report_fid)
     print("Successfully uploaded to GCS Bucket.")
   }
+  rm(data)
 }
