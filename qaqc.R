@@ -6,7 +6,7 @@ tier        <- "prod" # "prod" or "stg"
 module      <- "module4"
 # Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
 #          "module3", "module4", "blood_urine_mouthwash", "rca"
-testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
@@ -644,6 +644,9 @@ runQC <- function(data, rules, QC_report_location,ids){
     rules %>% filter(tolower(Qctype)==tolower("NA or crossValid3")) %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(tolower(Qctype)==tolower("NA or crossValid4")) %>% pmap_dfr(na_or_crossvalid,data=data,ids={{ids}},date=run_date),
     rules %>% filter(tolower(Qctype)==tolower("crossValid1Date")) %>% pmap_dfr(crossvalidDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(tolower(Qctype)==tolower("crossValid2Date")) %>% pmap_dfr(crossvalidDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(tolower(Qctype)==tolower("crossValid3Date")) %>% pmap_dfr(crossvalidDate,data=data,ids={{ids}},date=run_date),
+    rules %>% filter(tolower(Qctype)==tolower("crossValid4Date")) %>% pmap_dfr(crossvalidDate,data=data,ids={{ids}},date=run_date),
     rules %>% filter(tolower(Qctype)==tolower("crossValid1NotNA")) %>% pmap_dfr(crossValid_notNA,data=data,ids={{ids}},date=run_date),
     rules %>% filter(tolower(Qctype)==tolower("NA or dateTime")) %>% pmap_dfr(na_or_datetime,data=data,ids={{ids}},date=run_date),
     rules %>% filter(tolower(Qctype)==tolower("NA or date")) %>% pmap_dfr(na_or_date,data=data,ids={{ids}},date=run_date),
