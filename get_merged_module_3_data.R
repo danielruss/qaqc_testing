@@ -18,7 +18,7 @@ get_merged_module_3_data <- function(project) {
   parts_table <- bq_project_query(project, parts)
   parts_data <- bq_table_download(parts_table,
                                   bigint = "integer64")
-  
+
   mod3 <- glue(
     "SELECT * FROM `{project}.FlatConnect.module3_v1_JP` ",
     "WHERE Connect_ID IS NOT NULL"
@@ -26,7 +26,7 @@ get_merged_module_3_data <- function(project) {
   mod3_table <- bq_project_query(project, mod3)
   mod3_data <- bq_table_download(mod3_table,
                                  bigint = "integer64")
-  
+
   merged <- left_join(mod3_data, parts_data, by = "Connect_ID")
   merged
 }

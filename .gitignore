@@ -17,3 +17,7 @@ out.xlsx
 .vscode*
 Rprof.out
 uninvited_participants_qc.R
+*.csv
+concatenate_reports_b.py
+example_bq_download.R
+trigger_qaqc_cloud_runs.py
