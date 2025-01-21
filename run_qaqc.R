@@ -18,10 +18,11 @@
 
 
 run_qaqc <- function(dataset,
-         min_rule = 1,
+         min_rule = 0,
          max_rule = 10000,
          start_index = 0,
-         n_max = Inf) {
+         n_max = Inf,
+         data_chunk = NULL) {
   # Set environment variables to be used in the QAQC process
   Sys.setenv(R_CONFIG_FILE = glue("{tier}/config.yml"))
   Sys.setenv(R_CONFIG_ACTIVE = dataset) # Determines which config from config.yml to use
@@ -29,13 +30,13 @@ run_qaqc <- function(dataset,
   Sys.setenv(MAX_RULE = as.integer(max_rule))
   Sys.setenv(START_INDEX = as.integer(start_index))
   Sys.setenv(N_MAX = as.double(n_max))
-  
+
   # Inform the user that the QAQC process is starting
   message(glue("Starting {dataset} QAQC..."))
-  
+
   # Source the QAQC script to run the quality checks
   source("qaqc.R", echo = TRUE)
-  
+
   # Return a message indicating the completion of the QAQC process
   return(glue("{dataset} QAQC complete!"))
 }
@@ -47,7 +48,7 @@ dataset    <- "recruitment"
 dataset_id <- "FlatConnect"
 table      <- "participants_JP"
 
-# Load libraries 
+# Load libraries
 library(bigrquery)
 library(glue)
 bq_auth()
@@ -74,10 +75,11 @@ interval <- 100000  # Adjust as needed
 for (start_index in seq(0, total_rows, interval)) {
 
   print(glue("start_index: {start_index} last_row: {start_index + interval - 1}"))
-  
-  run_qaqc(dataset, 
+
+  run_qaqc(dataset,
            start_index = as.character(as.integer(start_index)),
            n_max = as.character(as.integer(interval-1)),
            min_rule = 0)
 }
+
 

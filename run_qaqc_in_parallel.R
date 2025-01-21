@@ -8,7 +8,7 @@ bq_auth()
 
 # Set report parameters
 tier       <- "prod"
-dataset    <- "recruitment"
+dataset    <- "rca"
 dataset_id <- "FlatConnect"
 table      <- "participants_JP"
 
@@ -37,7 +37,7 @@ output_dir <- "results"
 
 # Define a pattern matching your output file naming scheme.
 # Example pattern: qc_report_recruitment_prod_2025-01-13_chunk_14_boxfolder_211674408263_.xlsx
-pattern <- "^qc_report_recruitment_.*_chunk_(\\d+)_.*\\.xlsx$"
+pattern <- glue::glue("^qc_report_{dataset}_.*_chunk_(\\d+)_.*\\.xlsx$")
 
 # List existing output files in the output directory
 completed_files <- list.files(path = output_dir, pattern = pattern, full.names = FALSE)
@@ -141,11 +141,114 @@ process_chunk <- function(i) {
   return(result)
 }
 
+# Function to concatenate QAQC Excel reports
+concatenate_reports <- function(xlsx_directory = "results",
+                                output_file,
+                                sheet_report = "report",
+                                sheet_exclusions = "exclusions",
+                                sheet_rules = "rules",
+                                rule_id_filter = 280) {
+  # Load required libraries
+  library(dplyr)
+  library(readxl)
+  library(writexl)
+
+  # List all .xlsx files in the directory
+  xlsx_files <- list.files(xlsx_directory, pattern = "\\.xlsx$", full.names = TRUE)
+
+  if (length(xlsx_files) == 0) {
+    stop("No Excel files found in directory: ", xlsx_directory)
+  }
+
+  # Function to read and process one report file
+  read_report_file <- function(file_path, sheet_report, rule_id_filter) {
+    df <- readxl::read_xlsx(file_path, sheet = sheet_report)
+    # Force all columns to character
+    df[] <- lapply(df, as.character)
+    # Convert rule_id column to numeric if it exists and filter rows
+    if ("rule_id" %in% names(df)) {
+      df$rule_id <- as.numeric(df$rule_id)
+      df <- df %>% filter(rule_id != rule_id_filter)
+    }
+    return(df)
+  }
+
+  # Read each file's "report" sheet into a list of data frames
+  report_list <- lapply(xlsx_files, function(f) {
+    message("Processing file: ", f)
+    read_report_file(f, sheet_report, rule_id_filter)
+  })
+
+  # Determine the full union of column names across all data frames
+  all_columns <- unique(unlist(lapply(report_list, names)))
+
+  # Ensure each data frame has all the columns (fill in missing ones with NA_character_)
+  report_list <- lapply(report_list, function(df) {
+    missing_cols <- setdiff(all_columns, names(df))
+    if (length(missing_cols) > 0) {
+      df[missing_cols] <- NA_character_
+    }
+    # Reorder columns to be consistent
+    df <- df[all_columns]
+    return(df)
+  })
+
+  # Bind all report data frames into one and remove duplicates.
+  concatenated_report <- dplyr::bind_rows(report_list) %>%
+    distinct() %>%
+    arrange(rule_id, site_id)
+
+  # Process the "exclusions" sheet files.
+  exclusions_list <- lapply(xlsx_files, function(f) {
+    readxl::read_xlsx(f, sheet = sheet_exclusions) %>%
+      mutate_all(as.character)
+  })
+
+  concatenated_exclusions <- dplyr::bind_rows(exclusions_list) %>%
+    distinct() %>%
+    arrange(rule_id, site_id)
+
+  # Assume the 'rules' sheet is identical across files: use the last file.
+  rules_data <- readxl::read_xlsx(xlsx_files[length(xlsx_files)], sheet = sheet_rules) %>%
+    mutate_all(as.character)
+
+  # Write the concatenated data to an Excel file with three sheets.
+  writexl::write_xlsx(
+    list(
+      report = concatenated_report,
+      exclusions = concatenated_exclusions,
+      rules = rules_data
+    ),
+    path = output_file
+  )
+
+  message("Concatenated report successfully written to: ", output_file)
+  return(output_file)
+}
+
+# Define the main process ======================================================
 # Run the process in parallel using mclapply on only the missing chunks.
 # Here, we've reduced cores to 4 to help with network stability.
 if (length(chunks_to_run) > 0) {
-  results <- mclapply(chunks_to_run, process_chunk, mc.cores = 4)
+  results <- mclapply(chunks_to_run, process_chunk, mc.cores = 8)
   print(results)
 } else {
   message("No new chunks to process.")
 }
+
+# Now, concatenate the resulting Excel files
+
+output_file_path <- glue::glue("~/Documents/7_qaqc/qc_report_{dataset}_prod_{Sys.Date()}.xlsx")
+concatenate_reports(
+  xlsx_directory = output_dir,
+  output_file = output_file_path,
+  sheet_report = "report",
+  sheet_exclusions = "exclusions",
+  sheet_rules = "rules",
+  rule_id_filter = NULL
+)
+
+# After successful concatenation and verification:
+unlink(output_dir, recursive = TRUE)
+message(glue::glue("{output_dir} directory removed."))
+
