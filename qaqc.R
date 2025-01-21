@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/7_qaqc" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "module4"
+module      <- "biospecimen"
 # Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
 #          "module3", "module4", "blood_urine_mouthwash", "rca"
 testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
@@ -66,7 +66,7 @@ rows_str   <- glue("datarows{start_index}to{start_index+n_max}")
 # rows_str   <- glue("{start_date}to{end_date}")
 if (load_from_bq == TRUE) {
   report_fid <-
-    paste("results/qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "bq", ".xlsx", sep="_")
+    paste("qc_report", QC_REPORT, tier, flag, Sys.Date(), rules_str, rows_str, "boxfolder", boxfolder, ".xlsx", sep="_")
 } else {
   report_fid <-
     paste("results/qc_report", QC_REPORT, tier, Sys.Date(), "chunk", chunk_num, "boxfolder", boxfolder, ".xlsx", sep="_")
