@@ -8,7 +8,7 @@ default:
   box_folder: "211674408263"
   flag: "export2box"
   exclusions_file: ""
-  LOAD_FROM_BQ: TRUE
+  LOAD_FROM_BQ: FALSE
 biospecimen:
   QC_REPORT: biospecimen
   rules_file: qc_rules_biospecimen.xlsx
