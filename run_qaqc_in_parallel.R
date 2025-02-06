@@ -8,7 +8,7 @@ bq_auth()
 
 # Set report parameters
 tier       <- "prod"
-dataset    <- "rca"
+dataset    <- "recruitment"
 dataset_id <- "FlatConnect"
 table      <- "participants_JP"
 
@@ -28,7 +28,7 @@ total_rows   <- as.numeric(tbl_metadata$numRows)
 cat("Number of Rows:", total_rows, "\n")
 
 # Define number of chunks to use
-rows_per_chunk <- 25000
+rows_per_chunk <- 20000
 num_chunks <- ceiling(total_rows / rows_per_chunk)
 cat("Number of Chunks:", num_chunks, "\n")
 
@@ -116,7 +116,8 @@ process_chunk <- function(i) {
   query <- glue("
     SELECT *
     FROM `{project_id}.{dataset_id}.{table}`
-    WHERE MOD(FARM_FINGERPRINT(token), {num_chunks}) = {i}
+    WHERE d_831041022='104430631'
+    AND MOD(FARM_FINGERPRINT(token), {num_chunks}) = {i}
   ")
 
   # Run the query and get the job object
@@ -230,7 +231,7 @@ concatenate_reports <- function(xlsx_directory = "results",
 # Run the process in parallel using mclapply on only the missing chunks.
 # Here, we've reduced cores to 4 to help with network stability.
 if (length(chunks_to_run) > 0) {
-  results <- mclapply(chunks_to_run, process_chunk, mc.cores = 8)
+  results <- mclapply(chunks_to_run, process_chunk, mc.cores = 4)
   print(results)
 } else {
   message("No new chunks to process.")
@@ -244,8 +245,7 @@ concatenate_reports(
   output_file = output_file_path,
   sheet_report = "report",
   sheet_exclusions = "exclusions",
-  sheet_rules = "rules",
-  rule_id_filter = NULL
+  sheet_rules = "rules"
 )
 
 # After successful concatenation and verification:
