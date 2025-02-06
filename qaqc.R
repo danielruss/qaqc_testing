@@ -6,7 +6,7 @@ tier        <- "prod" # "prod" or "stg"
 module      <- "recruitment"
 # Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
 #          "module3", "module4", "blood_urine_mouthwash", "rca"
-testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
+testing_api <- TRUE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
 ################################################################################
 ################################################################################
 
