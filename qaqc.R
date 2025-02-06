@@ -3,7 +3,7 @@
 ################################################################################
 local_drive <- "/Users/petersjm/Documents/7_qaqc" #set to your working dir
 tier        <- "prod" # "prod" or "stg"
-module      <- "biospecimen"
+module      <- "recruitment"
 # Options: "blood_urine_mouthwash", "biospecimen", "module1", "module2",
 #          "module3", "module4", "blood_urine_mouthwash", "rca"
 testing_api <- FALSE # ONLY SET TO TRUE IF YOU ARE TESTING PLUMBER API
@@ -53,8 +53,6 @@ end_date      <- as.character(Sys.getenv("END_DATE"))
 sheet         <- NULL
 exclusions_fid <- config::get("exclusions_file")
 load_from_bq  <- config::get("LOAD_FROM_BQ")
-# if (!exists(data_fid))  data_fid <- Sys.getenv("DATA_FID")
-# if (!exists(chunk_num)) chunk_num <- Sys.getenv("CHUNK_NUM")
 
 
 #Authenticate to bigrquery
@@ -86,23 +84,31 @@ dl <-  dictionary %>% map(~.x[["Variable Label"]] %||% .x[["Variable Name"]]) %>
 ######################### User-defined Functions ###############################
 
 
-dictionary_lookup <- function(x){
-  # This function performs a dictionary lookup on a list of values stored in a
-  # global variable named "dl". The dictionary keys are expected to have the
-  # format "d_CID", where CID is a unique identifier for each value. For each
-  # input value, the function retrieves the corresponding value from the dictionary.
-  # If a value is not found in the dictionary, "NA" is used in the output list.
-  x=as.list(x)
+dictionary_lookup <- function(x) {
+  # Convert input to list and preserve its structure for later restoration.
+  x <- as.list(x)
   skel <- as.relistable(x)
+
+  # Unlist the input for easier manipulation.
   x <- unlist(x)
 
+  # Perform the dictionary lookup:
+  # 1. Use str_split_i to split by "d_" and get the CID (assuming it returns the last element).
+  # 2. Map over each CID to retrieve the corresponding value from the global 'dl'.
+  # 3. Replace any NULL (not found) values with "NA".
   x <- x %>%
-    str_split_i("d_", -1) %>% # Get last CID without "d_"
-    map(~dl[[.x]]) %>%
-    modify_if(is.null,~"NA")
-  x <- relist(x,skel)
+    str_split_i("d_", -1) %>%  # Extract the unique identifier (CID) from each value.
+    map(~ dl[[.x]]) %>%       # Lookup the value in the global dictionary 'dl'.
+    modify_if(is.null, ~ "NA")  # Replace any missing lookups with "NA".
+
+  # Restore the original list structure.
+  x <- relist(x, skel)
+
+  # (Optional) Set the class attribute to "list" if needed.
   class(x) <- "list"
 
+  # Explicitly return the modified list.
+  return(x)
 }
 
 # Convert comma sep vals to vector, handling caveats
@@ -611,7 +617,7 @@ report_bad_rules <- function(...){
                 .name_repair="universal"))
 }
 
-runQC <- function(data, rules, QC_report_location,ids){
+runQC <- function(data, rules, ids){
   run_date=Sys.time()
 
   rules <- find_errors(rules,data)
@@ -702,10 +708,6 @@ loadData <- function(project, table, where_clause,
 
     return(data)
 }
-
-library(bigrquery)
-library(glue)
-
 
 get_explanation <- function(x, data) {
   x <- x %>%
