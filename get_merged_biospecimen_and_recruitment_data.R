@@ -23,7 +23,7 @@ WITH
       d_826941471,
       d_137401245,
       d_221592017
-    FROM `{project}.FlatConnect.kitAssembly`
+    FROM `{project}.FlatConnect.kitAssembly_JP`
   )
 SELECT
   BIO.*,
