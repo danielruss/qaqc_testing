@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:latest
+FROM rocker/tidyverse:4.3
 RUN install2.r plyr rio plumber bigrquery googleCloudStorageR gargle janitor rlang config writexl
 COPY ["./qaqc.R", "./qaqc.R"]
 COPY ["./api.R",  "./api.R"]
